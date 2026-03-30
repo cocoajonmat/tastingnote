@@ -25,11 +25,15 @@ jobs:
         run: ./gradlew clean build -x test
 
       - name: SSH 키 설정
+        env:
+          SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/id_rsa
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.LIGHTSAIL_HOST }} >> ~/.ssh/known_hosts
+          echo "키 첫줄: $(head -1 ~/.ssh/id_rsa)"
+          echo "키 줄 수: $(wc -l < ~/.ssh/id_rsa)"
 
       - name: JAR 파일 서버로 전송
         run: |
