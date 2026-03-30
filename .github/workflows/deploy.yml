@@ -27,7 +27,7 @@ jobs:
       - name: SSH 키 설정
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.LIGHTSAIL_HOST }} >> ~/.ssh/known_hosts
 
