@@ -24,23 +24,17 @@ jobs:
       - name: JAR 빌드 (테스트 제외)
         run: ./gradlew clean build -x test
 
+      - name: SSH 키 설정
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LIGHTSAIL_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.LIGHTSAIL_HOST }} >> ~/.ssh/known_hosts
+
       - name: JAR 파일 서버로 전송
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USERNAME }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          source: "build/libs/*-SNAPSHOT.jar"
-          target: "/home/ubuntu/"
-          strip_components: 2
+        run: |
+          scp build/libs/*-SNAPSHOT.jar ${{ secrets.LIGHTSAIL_USERNAME }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app.jar
 
       - name: 서버에서 앱 재시작
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.LIGHTSAIL_HOST }}
-          username: ${{ secrets.LIGHTSAIL_USERNAME }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          script: |
-            mv /home/ubuntu/*-SNAPSHOT.jar /home/ubuntu/app.jar
-            sudo systemctl restart tastingnote
-            echo "배포 완료"
+        run: |
+          ssh ${{ secrets.LIGHTSAIL_USERNAME }}@${{ secrets.LIGHTSAIL_HOST }} "sudo systemctl restart tastingnote && echo 배포 완료"
