@@ -36,6 +36,16 @@ jobs:
         run: |
           scp build/libs/*-SNAPSHOT.jar ${{ secrets.LIGHTSAIL_USERNAME }}@${{ secrets.LIGHTSAIL_HOST }}:/home/ubuntu/app.jar
 
+      - name: 서버 환경변수 파일 생성
+        run: |
+          ssh ${{ secrets.LIGHTSAIL_USERNAME }}@${{ secrets.LIGHTSAIL_HOST }} "
+            echo 'JWT_SECRET=${{ secrets.JWT_SECRET }}' | sudo tee /etc/tastingnote.env > /dev/null
+            echo 'DB_URL=${{ secrets.DB_URL }}' | sudo tee -a /etc/tastingnote.env > /dev/null
+            echo 'DB_USERNAME=${{ secrets.DB_USERNAME }}' | sudo tee -a /etc/tastingnote.env > /dev/null
+            echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' | sudo tee -a /etc/tastingnote.env > /dev/null
+            sudo chmod 600 /etc/tastingnote.env
+          "
+
       - name: 서버에서 앱 재시작
         run: |
           ssh ${{ secrets.LIGHTSAIL_USERNAME }}@${{ secrets.LIGHTSAIL_HOST }} "sudo systemctl restart tastingnote && echo 배포 완료"

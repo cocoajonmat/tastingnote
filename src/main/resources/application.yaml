@@ -12,7 +12,6 @@ spring:
     open-in-view: false
 
 jwt:
-  secret: ${JWT_SECRET}
   access-token-expiration: 3600000       # 1시간 (ms)
   refresh-token-expiration: 2592000000   # 30일 (ms)
 

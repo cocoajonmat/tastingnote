@@ -1,4 +1,5 @@
 앞으로 이 내용을 기반으로 작업해줘.
+반드시 COLLABORATION.md와 FEATURES.md, LEARNING.md도 함께 읽고 시작해줘.
 
 ---
 
@@ -12,11 +13,12 @@
 ## 엔티티 설계 확정
 
 ### User
-- Soft Delete 방식 (deleted_at 컬럼)
+- Soft Delete 방식 (deleted_at 컬럼) ✅ 구현 완료
 - 탈퇴 시 → deleted_at에 현재시간 저장 + 해당 유저의 모든 Note.isPublic = false
 - 추후 선택적으로 Hard Delete 스케줄러 추가
 - 소셜 로그인 유저는 password null 허용
 - 소셜 로그인 첫 가입 시 닉네임 설정 페이지로 이동 + 실시간 중복 체크
+- 로그인 식별자: 이메일 (username 필드 제거됨)
 
 ### Alcohol
 - name(영문), nameKo(한글) 컬럼 분리
@@ -80,9 +82,7 @@
 - 비밀번호 찾기 / 재설정
 - NoteImage 개수 제한
 - 피드 페이지네이션 방식
-- 로그인 식별자 (이메일 vs username)
 - 기본 프로필 이미지
-- JWT 인증 연동 (엔티티/기능 설계 마무리 후 추가)
 - 임시저장 개수 제한 및 목록 구분 방식
 
 ---
@@ -90,6 +90,14 @@
 ## 패키지 구조
 com.dongjin.tastingnote
 ├── user/entity/User.java
+├── user/entity/RefreshToken.java
+├── user/repository/UserRepository.java
+├── user/repository/RefreshTokenRepository.java
+├── user/service/UserService.java
+├── user/controller/UserController.java
+├── user/dto/SignUpRequest.java
+├── user/dto/LoginRequest.java
+├── user/dto/TokenResponse.java
 ├── alcohol/entity/Alcohol.java
 ├── alcohol/entity/AlcoholAlias.java
 ├── note/entity/Note.java
@@ -97,10 +105,47 @@ com.dongjin.tastingnote
 ├── note/entity/Like.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
-└── flavor/entity/FlavorSuggestion.java
+├── flavor/entity/FlavorSuggestion.java (미구현)
+└── common/jwt/JwtTokenProvider.java
+└── common/jwt/JwtAuthenticationFilter.java
 
 ## 공통
 - 모든 엔티티는 BaseEntity 상속 (createdAt, updatedAt)
 - @ManyToOne은 fetch = FetchType.LAZY
 - Lombok 사용
 - @NoArgsConstructor(access = AccessLevel.PROTECTED)
+
+---
+
+## 구현 현황
+
+### 완료
+- 엔티티 전체 (User, Alcohol, AlcoholAlias, AlcoholCategory, Note, NoteImage, Like, Tag, NoteTag)
+- Note CRUD (NoteService, NoteController, DTO 3종)
+- JWT 인증 기반 구조 (JwtTokenProvider, JwtAuthenticationFilter)
+- User 인증 API (회원가입, 로그인, 로그아웃, 토큰 재발급)
+- SecurityConfig JWT 필터 등록 및 URL 인증 정책
+- 환경별 설정 분리 (application-local.yaml / application-prod.yaml)
+- 브랜치 전략 도입 (main + feature/*)
+- 현재 작업 브랜치: feature/jwt-auth
+
+### 미완성 (다음 순서)
+1. **GitHub Secrets 등록** (데스크탑에서 진행 예정)
+   - JWT_SECRET, DB_URL, DB_USERNAME, DB_PASSWORD 등록 필요
+   - 등록 후 서버 배포 테스트
+2. NoteController userId → JWT에서 추출로 변경 (현재 RequestParam으로 받음)
+3. FlavorSuggestion 엔티티 생성
+4. AlcoholService / AlcoholController
+5. TagService / TagController
+6. LikeService / LikeController
+7. NoteImage S3 업로드
+8. 소셜 로그인 (OAuth2)
+
+---
+
+## 인프라
+- 서버: AWS Lightsail (13.124.79.235)
+- CI/CD: GitHub Actions → SSH → systemctl restart tastingnote
+- Swagger: http://13.124.79.235:8080/tastingnote.swagger
+- 로컬: H2 인메모리 DB (application-local.yaml)
+- 서버: MySQL (application-prod.yaml, 환경변수로 주입)
