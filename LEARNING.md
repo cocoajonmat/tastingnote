@@ -114,9 +114,60 @@ userId를 담아서 SecurityContextHolder에 등록.
 
 ---
 
+### `SecurityConfig` (common/config/SecurityConfig.java)
+
+Spring Security 설정 클래스. JWT 필터 등록 및 URL별 인증 정책 설정.
+
+```java
+// 세션 미사용 — JWT는 서버가 상태를 저장하지 않음
+.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+
+// 인증 없이 접근 가능한 URL
+.requestMatchers("/api/auth/**", "/swagger-ui/**", ...).permitAll()
+// 나머지는 전부 토큰 필요
+.anyRequest().authenticated()
+
+// JwtAuthenticationFilter를 기본 로그인 필터보다 먼저 실행
+.addFilterBefore(new JwtAuthenticationFilter(...), UsernamePasswordAuthenticationFilter.class)
+```
+
+**`BCryptPasswordEncoder`** — 비밀번호 단방향 암호화 도구.
+DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식으로 암호화해서 비교.
+단방향이라 저장된 값으로 원래 비밀번호를 복원할 수 없음.
+
+---
+
+### `UserService` (user/service/UserService.java)
+
+회원가입, 로그인, 토큰 재발급, 로그아웃 비즈니스 로직.
+
+- **`signUp`** — 이메일/닉네임 중복 체크 후 비밀번호 암호화해서 저장. `Provider.LOCAL`로 일반 가입 표시.
+- **`login`** — 이메일로 유저 조회 후 `passwordEncoder.matches()`로 비밀번호 비교. 에러 메시지를 통일하는 이유: "이메일이 없습니다" vs "비밀번호가 틀렸습니다"를 구분하면 해커가 이메일 존재 여부를 알 수 있기 때문.
+- **`reissue`** — Refresh Token 검증 후 기존 토큰 삭제하고 새 토큰 발급 (재사용 방지).
+- **`logout`** — DB에서 Refresh Token 삭제. 이후 재발급 불가.
+- **`issueTokens`** — login/reissue 공통 토큰 발급 로직.
+- **`@Transactional`** — DB 작업 중 오류 발생 시 전체 롤백. 데이터 일관성 보장.
+
+---
+
+### `UserController` (user/controller/UserController.java)
+
+| 메서드 | URL | 설명 | 토큰 필요 |
+|--------|-----|------|-----------|
+| POST | `/api/auth/signup` | 회원가입 | X |
+| POST | `/api/auth/login` | 로그인 | X |
+| POST | `/api/auth/reissue` | 토큰 재발급 | X |
+| POST | `/api/auth/logout` | 로그아웃 | O |
+
+- **`@Valid`** — DTO의 검증 어노테이션(`@NotBlank`, `@Email` 등)을 실제로 실행. 없으면 검증이 동작 안 함.
+- **`@RequestHeader("Refresh-Token")`** — 요청 헤더에서 값을 꺼냄. 클라이언트가 `Refresh-Token: {token}` 헤더로 전송.
+- **`SecurityContextHolder.getContext().getAuthentication().getPrincipal()`** — JwtAuthenticationFilter에서 저장한 userId를 꺼내는 코드. 인증이 필요한 API에서 현재 로그인한 유저를 이렇게 가져옴.
+
+---
+
 ## 앞으로 추가 예정
 
-- `SecurityConfig` — JwtAuthenticationFilter 등록, 인증 필요/불필요 URL 구분
-- `UserRepository` — 이메일로 유저 조회
-- `UserService` — 회원가입, 로그인, 토큰 재발급
-- `UserController` — API 엔드포인트
+- `AlcoholService/Controller` — 술 검색 (name + nameKo + alias 통합)
+- `TagService/Controller` — 태그 자동완성, NoteTag 연결
+- `LikeService/Controller` — 반응 기능
+- `NoteController` userId → JWT에서 추출로 변경
