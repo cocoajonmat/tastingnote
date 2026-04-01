@@ -1,5 +1,6 @@
 package com.dongjin.tastingnote.user.controller;
 
+import com.dongjin.tastingnote.common.response.ApiResponse;
 import com.dongjin.tastingnote.user.dto.LoginRequest;
 import com.dongjin.tastingnote.user.dto.SignUpRequest;
 import com.dongjin.tastingnote.user.dto.TokenResponse;
@@ -18,27 +19,27 @@ public class UserController {
     private final UserService userService;
 
     @PostMapping("/signup")
-    public ResponseEntity<Void> signUp(@Valid @RequestBody SignUpRequest request) {
+    public ResponseEntity<ApiResponse<Void>> signUp(@Valid @RequestBody SignUpRequest request) {
         userService.signUp(request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse tokenResponse = userService.login(request);
-        return ResponseEntity.ok(tokenResponse);
+        return ResponseEntity.ok(ApiResponse.ok(tokenResponse));
     }
 
     @PostMapping("/reissue")
-    public ResponseEntity<TokenResponse> reissue(@RequestHeader("Refresh-Token") String refreshToken) {
+    public ResponseEntity<ApiResponse<TokenResponse>> reissue(@RequestHeader("Refresh-Token") String refreshToken) {
         TokenResponse tokenResponse = userService.reissue(refreshToken);
-        return ResponseEntity.ok(tokenResponse);
+        return ResponseEntity.ok(ApiResponse.ok(tokenResponse));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<ApiResponse<Void>> logout() {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         userService.logout(userId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }

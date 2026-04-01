@@ -1,5 +1,6 @@
 package com.dongjin.tastingnote.note.controller;
 
+import com.dongjin.tastingnote.common.response.ApiResponse;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
@@ -20,61 +21,53 @@ public class NoteController {
 
     private final NoteService noteService;
 
-    // 노트 생성
     @PostMapping
-    public ResponseEntity<NoteResponse> createNote(@Valid @RequestBody NoteCreateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(noteService.createNote(request));
+    public ResponseEntity<ApiResponse<NoteResponse>> createNote(@Valid @RequestBody NoteCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(noteService.createNote(request)));
     }
 
-    // 노트 단건 조회
     @GetMapping("/{noteId}")
-    public ResponseEntity<NoteResponse> getNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(noteService.getNote(noteId));
+    public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long noteId) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.getNote(noteId)));
     }
 
-    // 내 노트 조회 (전체 or 상태별)
     @GetMapping("/my")
-    public ResponseEntity<List<NoteResponse>> getMyNotes(
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> getMyNotes(
             @RequestParam Long userId,
             @RequestParam(required = false) NoteStatus status
     ) {
         if (status != null) {
-            return ResponseEntity.ok(noteService.getMyNotesByStatus(userId, status));
+            return ResponseEntity.ok(ApiResponse.ok(noteService.getMyNotesByStatus(userId, status)));
         }
-        return ResponseEntity.ok(noteService.getMyNotes(userId));
+        return ResponseEntity.ok(ApiResponse.ok(noteService.getMyNotes(userId)));
     }
 
-    // 공개 노트 조회 (소셜 피드)
     @GetMapping("/public")
-    public ResponseEntity<List<NoteResponse>> getPublicNotes() {
-        return ResponseEntity.ok(noteService.getPublicNotes());
+    public ResponseEntity<ApiResponse<List<NoteResponse>>> getPublicNotes() {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.getPublicNotes()));
     }
 
-    // 노트 수정
     @PatchMapping("/{noteId}")
-    public ResponseEntity<NoteResponse> updateNote(
+    public ResponseEntity<ApiResponse<NoteResponse>> updateNote(
             @PathVariable Long noteId,
             @Valid @RequestBody NoteUpdateRequest request
     ) {
-        return ResponseEntity.ok(noteService.updateNote(noteId, request));
+        return ResponseEntity.ok(ApiResponse.ok(noteService.updateNote(noteId, request)));
     }
 
-    // 노트 발행
     @PatchMapping("/{noteId}/publish")
-    public ResponseEntity<NoteResponse> publishNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(noteService.publishNote(noteId));
+    public ResponseEntity<ApiResponse<NoteResponse>> publishNote(@PathVariable Long noteId) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.publishNote(noteId)));
     }
 
-    // 임시저장으로 되돌리기
     @PatchMapping("/{noteId}/unpublish")
-    public ResponseEntity<NoteResponse> unpublishNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(noteService.unpublishNote(noteId));
+    public ResponseEntity<ApiResponse<NoteResponse>> unpublishNote(@PathVariable Long noteId) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.unpublishNote(noteId)));
     }
 
-    // 노트 삭제
     @DeleteMapping("/{noteId}")
-    public ResponseEntity<Void> deleteNote(@PathVariable Long noteId) {
+    public ResponseEntity<ApiResponse<Void>> deleteNote(@PathVariable Long noteId) {
         noteService.deleteNote(noteId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.ok());
     }
 }
