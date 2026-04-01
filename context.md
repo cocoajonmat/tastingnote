@@ -72,6 +72,13 @@
 - 공통 목록 하나 (술 카테고리별 분리 안 함)
 - Note 엔티티 변경 없이 별도 테이블로 관리
 
+### Report (신고) ✅ 구현 완료
+- 신고 사유: Enum (SPAM, INAPPROPRIATE, FALSE_INFO, OTHER)
+- OTHER일 때만 reasonDetail 텍스트 입력
+- 처리 상태: PENDING(대기) / RESOLVED(처리 완료)
+- 같은 유저가 같은 노트를 중복 신고 불가
+- 관리자 수동 처리 방식 (추후 자동화 가능)
+
 ---
 
 ## 기능 확정
@@ -128,7 +135,15 @@ com.dongjin.tastingnote
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
 ├── flavor/entity/FlavorSuggestion.java (미구현)
-└── common/jwt/JwtTokenProvider.java
+├── report/entity/Report.java
+├── report/entity/ReportReason.java
+├── report/entity/ReportStatus.java
+├── report/repository/ReportRepository.java
+├── report/service/ReportService.java
+├── report/controller/ReportController.java
+├── report/dto/ReportRequest.java
+├── common/response/ApiResponse.java
+├── common/jwt/JwtTokenProvider.java
 └── common/jwt/JwtAuthenticationFilter.java
 
 ## 공통

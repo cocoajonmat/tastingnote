@@ -170,7 +170,6 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 - `AlcoholService/Controller` — 술 검색 (name + nameKo + alias 통합)
 - `TagService/Controller` — 태그 자동완성, NoteTag 연결
 - `LikeService/Controller` — 반응 기능
-- `NoteController` userId → JWT에서 추출로 변경
 
 ---
 

@@ -75,8 +75,8 @@
 ## 개발 방향
 
 - **방식**: 탑다운 (엔티티 → Repository → Service → Controller)
-- **현재까지**: 엔티티 전체 + Note CRUD 완료
-- **다음 순서**: User → Alcohol → Tag → Like → FlavorSuggestion
+- **현재까지**: 엔티티 전체 + Note CRUD + JWT 인증 + ApiResponse + Report 완료
+- **다음 순서**: Alcohol → Tag → Like → FlavorSuggestion
 - **기능 목록**: `FEATURES.md` 참고 (친구와 구상한 초안, 세션마다 업데이트)
 
 ---
