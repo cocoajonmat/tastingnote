@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -17,9 +18,6 @@ public class User extends BaseEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(unique = true)
-    private String username;
 
     private String password;
 
@@ -41,4 +39,7 @@ public class User extends BaseEntity {
 
     @Column(name = "provider_id")
     private String providerId;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }
