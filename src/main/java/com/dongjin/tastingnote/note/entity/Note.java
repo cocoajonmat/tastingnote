@@ -40,7 +40,8 @@ public class Note extends BaseEntity {
 
     private String pairing;
 
-    private Integer rating;
+    @Column(precision = 2, scale = 1)
+    private Double rating;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -61,7 +62,7 @@ public class Note extends BaseEntity {
 
     // 노트 내용 수정
     public void update(String title, String taste, String aroma, String pairing,
-                       Integer rating, String description, Boolean isPublic,
+                       Double rating, String description, Boolean isPublic,
                        LocalDate drankAt, String location) {
         this.title = title;
         this.taste = taste;

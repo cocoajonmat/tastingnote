@@ -20,7 +20,7 @@ public class NoteResponse {
     private String taste;
     private String aroma;
     private String pairing;
-    private Integer rating;
+    private Double rating;
     private String description;
     private Boolean isPublic;
     private NoteStatus status;

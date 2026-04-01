@@ -19,9 +19,9 @@ public class NoteUpdateRequest {
     private String aroma;
     private String pairing;
 
-    @Min(value = 1, message = "별점은 1 이상이어야 합니다")
-    @Max(value = 5, message = "별점은 5 이하이어야 합니다")
-    private Integer rating;
+    @Min(value = 1, message = "별점은 1.0 이상이어야 합니다")
+    @Max(value = 5, message = "별점은 5.0 이하이어야 합니다")
+    private Double rating;
 
     private String description;
     private Boolean isPublic;

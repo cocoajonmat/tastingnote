@@ -35,7 +35,7 @@
 - alcohol 필드 (@ManyToOne, nullable) → DB에 있는 술
 - alcoholName 필드 (String, nullable) → DB에 없는 술 직접 입력
 - title → 필수
-- rating → 필수, 5점 만점 (1~5 정수), 추후 변경 가능성 있음
+- rating → 필수, 5점 만점 (1.0~5.0, 0.5단위) — DECIMAL(2,1) 타입
 - taste, aroma → 하이브리드 방식 (제안 목록 + 자유 입력 둘 다 허용)
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
