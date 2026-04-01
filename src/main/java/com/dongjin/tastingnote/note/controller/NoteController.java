@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,7 +24,8 @@ public class NoteController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<NoteResponse>> createNote(@Valid @RequestBody NoteCreateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(noteService.createNote(request)));
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(noteService.createNote(userId, request)));
     }
 
     @GetMapping("/{noteId}")
@@ -33,9 +35,9 @@ public class NoteController {
 
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getMyNotes(
-            @RequestParam Long userId,
             @RequestParam(required = false) NoteStatus status
     ) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (status != null) {
             return ResponseEntity.ok(ApiResponse.ok(noteService.getMyNotesByStatus(userId, status)));
         }

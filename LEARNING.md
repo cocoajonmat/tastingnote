@@ -225,3 +225,69 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 1. 초반엔 유저도 없고 관리할 데이터도 없음 → DB 툴로 직접 관리가 더 빠름
 2. 만들려면 JWT에 `ROLE_ADMIN` 권한을 추가하고 URL별 권한 체크 로직이 필요 → 지금은 불필요한 복잡도
 3. 유저가 늘어나서 직접 DB 관리가 힘들어질 때 만들어도 충분히 늦지 않음
+
+---
+
+## 신고(Report) 기능
+
+### 왜 만들었나?
+공개 피드가 생기면 부적절한 콘텐츠가 올라올 수 있어요.
+삭제/차단 같은 자동 처리는 복잡하니까, 우선 **신고 내용을 DB에 기록만 하고 관리자가 직접 처리하는 방식**으로 시작해요.
+나중에 유저가 늘어나면 자동 처리 로직을 추가하면 돼요.
+
+### 구조
+
+```
+ReportReason (Enum)   — 신고 사유 종류
+ReportStatus (Enum)   — 처리 상태
+Report (Entity)       — 신고 기록
+ReportRepository      — DB 조회/저장
+ReportRequest (DTO)   — 신고 요청 데이터
+ReportService         — 비즈니스 로직
+ReportController      — API 엔드포인트
+```
+
+### 각 파일 설명
+
+**ReportReason.java**
+신고 사유를 Enum으로 관리해요. String으로 받으면 "욕설", "욕", "나쁜말"처럼 제각각으로 들어오기 때문에 Enum으로 강제해요.
+```java
+SPAM          // 스팸 / 홍보
+INAPPROPRIATE // 부적절한 내용
+FALSE_INFO    // 허위 정보
+OTHER         // 기타 (reasonDetail에 직접 입력)
+```
+
+**ReportStatus.java**
+신고 처리 상태예요. 초반엔 PENDING만 쌓이고 관리자가 확인 후 RESOLVED로 바꾸는 방식이에요.
+
+**Report.java**
+신고 기록을 저장하는 엔티티예요.
+- `reporter` — 신고한 유저 (ManyToOne)
+- `note` — 신고된 노트 (ManyToOne)
+- `reason` — 신고 사유 (Enum)
+- `reasonDetail` — 기타(OTHER)일 때만 입력받는 텍스트
+- `status` — 처리 상태, 기본값 PENDING
+
+**ReportRepository.java**
+`existsByReporterIdAndNoteId` 메서드 하나가 핵심이에요.
+같은 유저가 같은 노트를 중복 신고하는 것을 막기 위해 사용해요.
+
+**ReportService.java**
+신고 처리 로직이에요. 두 가지를 확인해요:
+1. 중복 신고 여부 체크 → 이미 신고했으면 에러
+2. 신고자/노트 존재 여부 확인 후 DB에 저장
+
+**ReportController.java**
+`POST /api/notes/{noteId}/report` — JWT에서 신고자 userId를 추출하고 서비스에 전달해요.
+
+### API 사용 예시
+```json
+POST /api/notes/42/report
+Authorization: Bearer {accessToken}
+
+{
+  "reason": "OTHER",
+  "reasonDetail": "허위 리뷰 같아요"
+}
+```

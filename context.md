@@ -22,6 +22,7 @@
 - 소셜 로그인 유저는 password null 허용
 - 소셜 로그인 첫 가입 시 닉네임 설정 페이지로 이동 + 실시간 중복 체크
 - 로그인 식별자: 이메일 (username 필드 제거됨)
+- 닉네임 변경: 허용, 30일 1회 제한 / 프로필 URL은 내부 ID 기반 (nicknameChangedAt 컬럼 추가 필요)
 - 프로필 페이지: 미니 포트폴리오 방식
     - 공개 노트 목록
     - 많이 마신 술 카테고리 (예: "위스키 애호가")
@@ -38,6 +39,10 @@
     - 1단계: SQL로 초기 데이터 미리 삽입 (자주 마시는 술 위주)
     - 2단계(추후): 유저 등록 요청 → 관리자 승인 방식 추가
     - 어드민 페이지는 지금 만들지 않음
+- 술 상세 페이지 도입 검토 중 (친구와 상의 필요)
+    - 해당 술의 평균 별점, 다른 유저 노트 목록 등 집약
+    - Vivino 방식 참고 — 술 페이지가 핵심 콘텐츠가 됨
+    - Discovery 기능(Q3)과도 연결됨
 
 ### Note
 - alcohol 필드 (@ManyToOne, nullable) → DB에 있는 술
@@ -88,6 +93,7 @@
 - 공개 노트 피드
 - 정렬: 좋아요 많은 순(기본) + 최신순 선택 가능
 - 페이지네이션: 커서 방식 (무한 스크롤, 실시간 피드 중복/누락 방지)
+- 신고 기능: 신고 버튼만 우선 구현, DB에 기록 후 관리자 수동 처리 (추후 자동화 가능)
 
 ---
 
@@ -143,19 +149,21 @@ com.dongjin.tastingnote
 - SecurityConfig JWT 필터 등록 및 URL 인증 정책
 - 환경별 설정 분리 (application-local.yaml / application-prod.yaml)
 - 브랜치 전략 도입 (main + feature/*)
+- 공통 ApiResponse<T> 적용 (모든 컨트롤러)
+- NoteController userId → JWT에서 추출 완료
+- 신고(Report) 기능 (ReportEntity, ReportService, ReportController)
 - 현재 작업 브랜치: feature/jwt-auth
 
 ### 미완성 (다음 순서)
 1. **GitHub Secrets 등록** (데스크탑에서 진행 예정)
    - JWT_SECRET, DB_URL, DB_USERNAME, DB_PASSWORD 등록 필요
    - 등록 후 서버 배포 테스트
-2. NoteController userId → JWT에서 추출로 변경 (현재 RequestParam으로 받음)
-3. FlavorSuggestion 엔티티 생성
-4. AlcoholService / AlcoholController
-5. TagService / TagController
-6. LikeService / LikeController
-7. NoteImage S3 업로드
-8. 소셜 로그인 (OAuth2)
+2. FlavorSuggestion 엔티티 생성
+3. AlcoholService / AlcoholController
+4. TagService / TagController
+5. LikeService / LikeController
+6. NoteImage S3 업로드
+7. 소셜 로그인 (OAuth2)
 
 ---
 

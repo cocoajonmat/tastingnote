@@ -13,9 +13,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class NoteCreateRequest {
 
-    @NotNull(message = "userId는 필수입니다")
-    private Long userId; // 임시 - 나중에 JWT로 교체
-
     private Long alcoholId;   // DB에 있는 술 선택 시
     private String alcoholName; // 직접 입력 시
 

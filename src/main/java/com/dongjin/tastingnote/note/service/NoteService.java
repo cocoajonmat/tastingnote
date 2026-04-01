@@ -27,8 +27,8 @@ public class NoteService {
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
-    public NoteResponse createNote(NoteCreateRequest request) {
-        User user = userRepository.findById(request.getUserId())
+    public NoteResponse createNote(Long userId, NoteCreateRequest request) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다"));
 
         Alcohol alcohol = null;
