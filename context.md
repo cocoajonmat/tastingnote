@@ -170,18 +170,19 @@ com.dongjin.tastingnote
 - Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
-- 현재 작업 브랜치: feature/jwt-auth
+- 현재 작업 브랜치: feature/jwt-auth → main 머지 완료 (2026-04-02)
+- GitHub Actions CI/CD 배포 성공 확인
+- 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
 
 ### 미완성 (다음 순서)
-1. **GitHub Secrets 등록** (데스크탑에서 진행 예정)
-   - JWT_SECRET, DB_URL, DB_USERNAME, DB_PASSWORD 등록 필요
-   - 등록 후 서버 배포 테스트
-2. FlavorSuggestion 엔티티 생성
-3. AlcoholService / AlcoholController
-4. TagService / TagController
-5. LikeService / LikeController
-6. NoteImage S3 업로드
-7. 소셜 로그인 (OAuth2)
+> 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
+
+1. FlavorSuggestion 엔티티 생성
+2. AlcoholService / AlcoholController
+3. TagService / TagController
+4. LikeService / LikeController
+5. NoteImage S3 업로드
+6. 소셜 로그인 (OAuth2)
 
 ---
 
