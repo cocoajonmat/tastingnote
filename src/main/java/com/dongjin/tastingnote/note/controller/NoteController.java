@@ -6,6 +6,9 @@ import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.service.NoteService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "노트", description = "노트 작성, 조회, 수정, 삭제 관련 API")
 @RestController
 @RequestMapping("/api/notes")
 @RequiredArgsConstructor
@@ -22,20 +26,22 @@ public class NoteController {
 
     private final NoteService noteService;
 
-    // 노트 생성
+    @Operation(summary = "노트 생성", description = "새 노트를 생성합니다. status 필드로 DRAFT(임시저장) 또는 PUBLISHED(발행) 선택 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<NoteResponse>> createNote(@Valid @RequestBody NoteCreateRequest request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(noteService.createNote(userId, request)));
     }
 
-    // 노트 단건 조회
+    @Operation(summary = "노트 단건 조회", description = "noteId로 특정 노트를 조회합니다.")
     @GetMapping("/{noteId}")
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long noteId) {
         return ResponseEntity.ok(ApiResponse.ok(noteService.getNote(noteId)));
     }
 
-    // 내 노트 조회 (전체 or 상태별)
+    @Operation(summary = "내 노트 목록 조회", description = "내 노트 전체 또는 상태별로 조회합니다. status 파라미터 없으면 전체 조회, DRAFT 또는 PUBLISHED로 필터링 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/my")
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getMyNotes(
             @RequestParam(required = false) NoteStatus status
@@ -47,13 +53,14 @@ public class NoteController {
         return ResponseEntity.ok(ApiResponse.ok(noteService.getMyNotes(userId)));
     }
 
-    // 공개 노트 조회 (소셜 피드)
+    @Operation(summary = "공개 노트 피드 조회", description = "모든 유저의 공개(isPublic=true, PUBLISHED) 노트를 조회합니다.")
     @GetMapping("/public")
     public ResponseEntity<ApiResponse<List<NoteResponse>>> getPublicNotes() {
         return ResponseEntity.ok(ApiResponse.ok(noteService.getPublicNotes()));
     }
 
-    // 노트 수정
+    @Operation(summary = "노트 수정", description = "노트 내용을 수정합니다. 요청에 포함된 필드만 업데이트됩니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}")
     public ResponseEntity<ApiResponse<NoteResponse>> updateNote(
             @PathVariable Long noteId,
@@ -62,19 +69,22 @@ public class NoteController {
         return ResponseEntity.ok(ApiResponse.ok(noteService.updateNote(noteId, request)));
     }
 
-    // 노트 발행
+    @Operation(summary = "노트 발행", description = "DRAFT 상태의 노트를 PUBLISHED 상태로 변경합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}/publish")
     public ResponseEntity<ApiResponse<NoteResponse>> publishNote(@PathVariable Long noteId) {
         return ResponseEntity.ok(ApiResponse.ok(noteService.publishNote(noteId)));
     }
 
-    // 임시저장으로 되돌리기
+    @Operation(summary = "노트 임시저장으로 되돌리기", description = "PUBLISHED 상태의 노트를 DRAFT 상태로 되돌립니다. isPublic이 자동으로 false가 됩니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}/unpublish")
     public ResponseEntity<ApiResponse<NoteResponse>> unpublishNote(@PathVariable Long noteId) {
         return ResponseEntity.ok(ApiResponse.ok(noteService.unpublishNote(noteId)));
     }
 
-    // 노트 삭제
+    @Operation(summary = "노트 삭제", description = "노트를 삭제합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{noteId}")
     public ResponseEntity<ApiResponse<Void>> deleteNote(@PathVariable Long noteId) {
         noteService.deleteNote(noteId);
