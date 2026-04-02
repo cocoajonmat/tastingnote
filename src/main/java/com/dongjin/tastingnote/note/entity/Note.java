@@ -40,7 +40,7 @@ public class Note extends BaseEntity {
 
     private String pairing;
 
-    @Column(precision = 2, scale = 1)
+    @Column(columnDefinition = "DECIMAL(2,1)")
     private Double rating;
 
     @Column(columnDefinition = "TEXT")

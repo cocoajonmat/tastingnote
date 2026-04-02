@@ -230,9 +230,9 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 ## 신고(Report) 기능
 
 ### 왜 만들었나?
-공개 피드가 생기면 부적절한 콘텐츠가 올라올 수 있어요.
-삭제/차단 같은 자동 처리는 복잡하니까, 우선 **신고 내용을 DB에 기록만 하고 관리자가 직접 처리하는 방식**으로 시작해요.
-나중에 유저가 늘어나면 자동 처리 로직을 추가하면 돼요.
+공개 피드가 생기면 부적절한 콘텐츠가 올라올 수 있음.
+삭제/차단 같은 자동 처리는 복잡하므로, 우선 **신고 내용을 DB에 기록만 하고 관리자가 직접 처리하는 방식**으로 시작.
+나중에 유저가 늘어나면 자동 처리 로직 추가 가능.
 
 ### 구조
 
@@ -249,7 +249,7 @@ ReportController      — API 엔드포인트
 ### 각 파일 설명
 
 **ReportReason.java**
-신고 사유를 Enum으로 관리해요. String으로 받으면 "욕설", "욕", "나쁜말"처럼 제각각으로 들어오기 때문에 Enum으로 강제해요.
+신고 사유를 Enum으로 관리. String으로 받으면 "욕설", "욕", "나쁜말"처럼 제각각으로 들어오기 때문에 Enum으로 강제.
 ```java
 SPAM          // 스팸 / 홍보
 INAPPROPRIATE // 부적절한 내용
@@ -258,10 +258,10 @@ OTHER         // 기타 (reasonDetail에 직접 입력)
 ```
 
 **ReportStatus.java**
-신고 처리 상태예요. 초반엔 PENDING만 쌓이고 관리자가 확인 후 RESOLVED로 바꾸는 방식이에요.
+신고 처리 상태. 초반엔 PENDING만 쌓이고 관리자가 확인 후 RESOLVED로 바꾸는 방식.
 
 **Report.java**
-신고 기록을 저장하는 엔티티예요.
+신고 기록을 저장하는 엔티티.
 - `reporter` — 신고한 유저 (ManyToOne)
 - `note` — 신고된 노트 (ManyToOne)
 - `reason` — 신고 사유 (Enum)
@@ -269,16 +269,16 @@ OTHER         // 기타 (reasonDetail에 직접 입력)
 - `status` — 처리 상태, 기본값 PENDING
 
 **ReportRepository.java**
-`existsByReporterIdAndNoteId` 메서드 하나가 핵심이에요.
-같은 유저가 같은 노트를 중복 신고하는 것을 막기 위해 사용해요.
+`existsByReporterIdAndNoteId` 메서드 하나가 핵심.
+같은 유저가 같은 노트를 중복 신고하는 것을 막기 위해 사용.
 
 **ReportService.java**
-신고 처리 로직이에요. 두 가지를 확인해요:
+신고 처리 로직. 두 가지를 확인:
 1. 중복 신고 여부 체크 → 이미 신고했으면 에러
 2. 신고자/노트 존재 여부 확인 후 DB에 저장
 
 **ReportController.java**
-`POST /api/notes/{noteId}/report` — JWT에서 신고자 userId를 추출하고 서비스에 전달해요.
+`POST /api/notes/{noteId}/report` — JWT에서 신고자 userId를 추출하고 서비스에 전달.
 
 ### API 사용 예시
 ```json
@@ -290,3 +290,78 @@ Authorization: Bearer {accessToken}
   "reasonDetail": "허위 리뷰 같아요"
 }
 ```
+
+---
+
+## Swagger 문서화 어노테이션
+
+### 왜 만들었나?
+프론트 개발자(친구)가 Swagger UI에서 각 API가 어떤 역할인지 설명이 없어서 매번 코드를 직접 확인해야 했음.
+어노테이션 3개를 추가해서 Swagger UI만 봐도 API를 이해하고 테스트할 수 있게 만듦.
+
+### 각 어노테이션 설명
+
+**`@Tag`** — 클래스에 붙여서 API를 그룹으로 묶음. Swagger UI에서 탭처럼 분리되어 보임.
+```java
+@Tag(name = "인증", description = "회원가입, 로그인, 토큰 관련 API")
+public class UserController { ... }
+```
+→ Swagger UI에서 "인증" 탭 아래 UserController의 API들이 묶여서 보임
+
+**`@Operation`** — 메서드에 붙여서 API 이름과 설명 표시. `summary`는 짧은 제목, `description`은 상세 설명.
+```java
+@Operation(summary = "로그인", description = "이메일과 비밀번호로 로그인합니다.")
+@PostMapping("/login")
+public ResponseEntity<...> login(...) { ... }
+```
+
+**`@SecurityRequirement`** — JWT 토큰이 필요한 API에 자물쇠 아이콘 표시.
+Swagger UI 우측 상단 **Authorize** 버튼으로 토큰을 한 번 입력하면, 이 어노테이션이 붙은 모든 API에 자동으로 토큰 적용.
+```java
+@SecurityRequirement(name = "bearerAuth")
+@PostMapping("/logout")
+public ResponseEntity<...> logout() { ... }
+```
+
+**`SecurityScheme` 등록** — `@SecurityRequirement`가 동작하려면 SwaggerConfig에 `bearerAuth`라는 이름으로 JWT 방식을 먼저 등록해야 함.
+```java
+.components(new Components()
+    .addSecuritySchemes("bearerAuth", new SecurityScheme()
+            .type(SecurityScheme.Type.HTTP)
+            .scheme("bearer")
+            .bearerFormat("JWT")));
+```
+
+### JWT 필요 여부 기준
+| API | 토큰 필요? | 이유 |
+|-----|-----------|------|
+| 회원가입, 로그인, 토큰 재발급 | X | 로그인 전 접근 가능해야 함 |
+| 공개 피드 조회, 노트 단건 조회 | X | 비로그인 유저도 볼 수 있음 |
+| 로그아웃, 노트 생성/수정/삭제, 신고 | O | 본인 확인이 필요한 작업 |
+
+---
+
+## `@Column(columnDefinition)`로 소수점 타입 지정하기
+
+### 왜 만들었나?
+`rating` 필드를 `Double` 타입 + `@Column(precision = 2, scale = 1)`로 설정했더니 앱 실행 시 아래 에러 발생.
+```
+scale has no meaning for SQL floating point types
+```
+Hibernate 6부터 `Double` 같은 부동소수점 타입에는 `scale` 지정 불가.
+`precision`/`scale`은 `BigDecimal` 같은 고정 소수 타입에서만 사용 가능.
+
+### 해결
+`columnDefinition`으로 DB 컬럼 타입을 직접 지정하면 Hibernate의 타입 검사를 우회 가능.
+```java
+// 변경 전 — Hibernate 6에서 오류
+@Column(precision = 2, scale = 1)
+private Double rating;
+
+// 변경 후 — 정상 동작
+@Column(columnDefinition = "DECIMAL(2,1)")
+private Double rating;
+```
+
+**`DECIMAL(2,1)`** — 전체 자릿수 2자리, 소수점 1자리. 즉 1.0 ~ 9.9 범위 저장 가능.
+H2, MySQL 둘 다 `DECIMAL` 타입을 지원하기 때문에 환경에 따라 코드 변경 불필요.

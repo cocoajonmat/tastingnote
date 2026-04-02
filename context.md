@@ -167,6 +167,9 @@ com.dongjin.tastingnote
 - 공통 ApiResponse<T> 적용 (모든 컨트롤러)
 - NoteController userId → JWT에서 추출 완료
 - 신고(Report) 기능 (ReportEntity, ReportService, ReportController)
+- Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
+- SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
+- Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
 - 현재 작업 브랜치: feature/jwt-auth
 
 ### 미완성 (다음 순서)
