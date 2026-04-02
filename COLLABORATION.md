@@ -46,7 +46,7 @@
 - 완성되면 `main`에 PR(Pull Request)을 열고 머지
 - 예시:
   ```
-  feature/jwt-auth       ← JWT 인증 개발 (현재)
+  feature/jwt-auth       ← JWT 인증 개발 (완료)
   feature/alcohol-api    ← 술 검색 API 개발
   feature/tag-api        ← 태그 기능 개발
   ```
