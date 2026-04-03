@@ -149,6 +149,7 @@ com.dongjin.tastingnote
 ├── report/controller/ReportController.java
 ├── report/dto/ReportRequest.java
 ├── common/response/ApiResponse.java
+├── common/exception/GlobalExceptionHandler.java
 ├── common/jwt/JwtTokenProvider.java
 └── common/jwt/JwtAuthenticationFilter.java
 
@@ -182,6 +183,7 @@ com.dongjin.tastingnote
 - FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
 - feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
 - AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
+- GlobalExceptionHandler 구현 완료 (feature/alcohol-api, 2026-04-03)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`

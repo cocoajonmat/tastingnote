@@ -168,8 +168,39 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 ## 앞으로 추가 예정
 
 - ~~`AlcoholService/Controller`~~ ✅ 완료
+- ~~`GlobalExceptionHandler`~~ ✅ 완료
 - `TagService/Controller` — 태그 자동완성, NoteTag 연결
 - `LikeService/Controller` — 반응 기능
+
+---
+
+## GlobalExceptionHandler (common/exception/GlobalExceptionHandler.java)
+
+### 왜 만들었나?
+예외 처리 없이는 에러 발생 시 500 + HTML 에러 페이지가 내려가서 프론트가 파싱을 못 함.
+모든 API에 공통 에러 응답 형식(`ApiResponse.fail(message)`)을 적용하기 위해 만듦.
+
+### 핵심 어노테이션
+**`@RestControllerAdvice`** — 애플리케이션 전체에서 발생하는 예외를 한 곳에서 처리하는 클래스임을 선언.
+**`@ExceptionHandler`** — 특정 예외 타입이 발생했을 때 실행할 메서드를 지정.
+
+### 우선순위 규칙
+Spring은 **가장 구체적인 타입부터** 매칭시킴.
+```
+IllegalArgumentException 발생 → IllegalArgumentException 핸들러
+MethodArgumentNotValidException 발생 → MethodArgumentNotValidException 핸들러
+그 외 모든 예외 → Exception 핸들러 (가장 넓은 범위, 마지막에 처리)
+```
+
+### 현재 처리 목록
+| 예외 | 원인 | HTTP 상태 |
+|------|------|-----------|
+| `IllegalArgumentException` | 비즈니스 로직 에러 (존재하지 않는 리소스, 중복 등) | 400 |
+| `MethodArgumentNotValidException` | `@Valid` 검증 실패 (필수값 누락, 형식 오류 등) | 400 |
+| `Exception` | 예상 못한 서버 에러 | 500 |
+
+### 나중에 추가하는 방법
+커스텀 예외 클래스(`NotFoundException` 등)를 만들고 핸들러 하나만 추가하면 바로 적용됨.
 
 ---
 
