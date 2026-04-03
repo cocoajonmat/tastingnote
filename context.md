@@ -19,6 +19,9 @@
     - 30일 유예 기간 후 Hard Delete 스케줄러로 완전 삭제
     - 유예 기간 중 계정 복구 가능
     - 탈퇴 시 연관 데이터(좋아요, 태그 등) 유지 → Hard Delete 시 함께 삭제
+- 탈퇴 후 30일 유예 기간 중 동일 이메일 재가입 불가 (Hard Delete 후에만 허용)
+  - 이유: 신고 누적으로 탈퇴한 유저가 즉시 재가입하면 신고 기록이 무의미해짐. 30일 유예는 실수로 탈퇴한 유저의 복구 기간이지 우회 경로가 되면 안 됨
+  - 코드: existsByEmail이 deletedAt 여부 상관없이 이메일 중복 체크 → 의도된 동작
 - 소셜 로그인 유저는 password null 허용
 - 소셜 로그인 첫 가입 시 닉네임 설정 페이지로 이동 + 실시간 중복 체크
 - 로그인 식별자: 이메일 (username 필드 제거됨)
@@ -214,6 +217,10 @@ com.dongjin.tastingnote
    - GET /api/alcohols/{id} (단건 조회)
    - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
 3. TagService / TagController
+   - **결정 필요**: Tag 엔티티에 `count` 필드가 있으나, context.md 확정 내용은 "NoteTag 개수 실시간 카운팅 방식 (Tag 테이블 컬럼 추가 없음)"
+     - A안: count 컬럼 유지 — 추가/삭제 시 +1/-1, 조회 빠르지만 동기화 안 맞을 수 있음
+     - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
+     - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
 4. LikeService / LikeController
 5. NoteImage S3 업로드
 6. 소셜 로그인 (OAuth2)
