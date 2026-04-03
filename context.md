@@ -14,7 +14,7 @@
 
 ### User
 - Soft Delete 방식 (deleted_at 컬럼) ✅ 구현 완료
-- 회원탈퇴:
+- 회원탈퇴: ❌ 미구현
     - 탈퇴 시 deleted_at 기록 + 모든 노트 isPublic = false
     - 30일 유예 기간 후 Hard Delete 스케줄러로 완전 삭제
     - 유예 기간 중 계정 복구 가능
@@ -25,7 +25,7 @@
 - 소셜 로그인 유저는 password null 허용
 - 소셜 로그인 첫 가입 시 닉네임 설정 페이지로 이동 + 실시간 중복 체크
 - 로그인 식별자: 이메일 (username 필드 제거됨)
-- 닉네임 변경: 허용, 30일 1회 제한 / 프로필 URL은 내부 ID 기반 (nicknameChangedAt 컬럼 추가 필요)
+- 닉네임 변경: 허용, 30일 1회 제한 / 프로필 URL은 내부 ID 기반 (nicknameChangedAt 컬럼 추가 필요 — 미구현)
 - 프로필 페이지: 미니 포트폴리오 방식
     - 공개 노트 목록
     - 많이 마신 술 카테고리 (예: "위스키 애호가")
@@ -42,6 +42,11 @@
     - 1단계: SQL로 초기 데이터 미리 삽입 (자주 마시는 술 위주)
     - 2단계(추후): 유저 등록 요청 → 관리자 승인 방식 추가
     - 어드민 페이지는 지금 만들지 않음
+- 크라우드소싱 방식 확정 (추후 구현 시):
+    - 유저가 공식 명칭 + 별칭을 함께 제안, 관리자가 검토 후 승인
+    - 별칭도 유저가 직접 제안 (관리자가 직접 입력하는 방식은 작업량 과다)
+    - 이유: 유저가 실제로 쓰는 별칭을 관리자보다 더 잘 알고 있음. 별칭이 많을수록 검색 품질 향상
+    - 구현 시 AlcoholRequest 테이블 추가 필요 (name, nameKo, aliases, status: PENDING/APPROVED/REJECTED)
 - 술 상세 페이지 도입 검토 중 (친구와 상의 필요)
     - 해당 술의 평균 별점, 다른 유저 노트 목록 등 집약
     - Vivino 방식 참고 — 술 페이지가 핵심 콘텐츠가 됨
@@ -70,7 +75,7 @@
 - LikeType: LIKE, LOVE, WANT, IMPRESSED, HELPFUL
 - 노트당 하나만 선택 가능
 
-### FlavorSuggestion (새 테이블 추가)
+### FlavorSuggestion (새 테이블 추가) ✅ 구현 완료
 - taste/aroma 입력 시 제안 목록용
 - 공통 목록 하나 (술 카테고리별 분리 안 함)
 - Note 엔티티 변경 없이 별도 테이블로 관리
@@ -191,7 +196,7 @@ com.dongjin.tastingnote
 - 공통 ApiResponse<T> 적용 (모든 컨트롤러)
 - NoteController userId → JWT에서 추출 완료
 - 신고(Report) 기능 (ReportEntity, ReportService, ReportController)
-- Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
+- Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 5개: UserController, NoteController, ReportController, AlcoholController, FlavorSuggestionController)
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
 - feature/jwt-auth → main 머지 완료 (2026-04-02)
@@ -207,6 +212,8 @@ com.dongjin.tastingnote
   - 비공개/DRAFT 노트 타인 조회 차단
   - 자기 노트 신고 방지
   - SecurityConfig 공개 피드(/api/notes/public) 비로그인 허용 추가
+  - DRAFT 상태 노트 isPublic=true 설정 차단 (NoteService updateNote)
+- NoteCreateRequest rating @NotNull 필수 검증 추가 (feature/alcohol-api, 2026-04-03)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`

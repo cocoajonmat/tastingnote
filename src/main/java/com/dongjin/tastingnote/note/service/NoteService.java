@@ -101,6 +101,9 @@ public class NoteService {
         if (!note.getUser().getId().equals(userId)) {
             throw new IllegalArgumentException("본인의 노트만 수정할 수 있습니다");
         }
+        if (Boolean.TRUE.equals(request.getIsPublic()) && note.getStatus() == NoteStatus.DRAFT) {
+            throw new IllegalArgumentException("임시저장 상태에서는 공개 설정을 할 수 없습니다");
+        }
 
         note.update(
                 request.getTitle(),
