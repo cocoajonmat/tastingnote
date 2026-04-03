@@ -134,7 +134,13 @@ com.dongjin.tastingnote
 ├── note/entity/Like.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
-├── flavor/entity/FlavorSuggestion.java (미구현)
+├── flavor/entity/FlavorSuggestion.java
+├── flavor/repository/FlavorSuggestionRepository.java
+├── flavor/service/FlavorSuggestionService.java
+├── flavor/controller/FlavorSuggestionController.java
+├── alcohol/dto/AlcoholResponse.java
+├── alcohol/service/AlcoholService.java
+├── alcohol/controller/AlcoholController.java
 ├── report/entity/Report.java
 ├── report/entity/ReportReason.java
 ├── report/entity/ReportStatus.java
@@ -173,12 +179,19 @@ com.dongjin.tastingnote
 - 현재 작업 브랜치: feature/jwt-auth → main 머지 완료 (2026-04-02)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
+- FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
+- feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
+- AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
 
-1. FlavorSuggestion 엔티티 생성
-2. AlcoholService / AlcoholController
+1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
+2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
+   - GET /api/alcohols/search?keyword= (name + nameKo + alias 통합 검색)
+   - GET /api/alcohols?category= (카테고리별 목록)
+   - GET /api/alcohols/{id} (단건 조회)
+   - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
 3. TagService / TagController
 4. LikeService / LikeController
 5. NoteImage S3 업로드

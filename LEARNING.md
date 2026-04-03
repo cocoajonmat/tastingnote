@@ -167,9 +167,39 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 ## 앞으로 추가 예정
 
-- `AlcoholService/Controller` — 술 검색 (name + nameKo + alias 통합)
+- ~~`AlcoholService/Controller`~~ ✅ 완료
 - `TagService/Controller` — 태그 자동완성, NoteTag 연결
 - `LikeService/Controller` — 반응 기능
+
+---
+
+## Git 브랜치 머지 방향
+
+머지는 **덮어쓰기가 아니라 합치기**다. 방향이 두 가지로 나뉜다.
+
+### feature → main (내 작업을 main에 올리기)
+기능 개발 완료 후 PR을 열어 main에 머지.
+
+### main → feature (main 변경사항을 내 브랜치로 가져오기)
+```bash
+git merge main
+```
+예: flavor 버그 수정이 main에 머지된 후, alcohol-api 브랜치에서 위 명령 실행.
+→ main의 변경사항만 추가로 들어오고, 내가 만든 파일(AlcoholController 등)은 그대로 유지됨.
+
+**Git이 하는 일**: "main에는 있는데 내 브랜치에 없는 변경사항"만 가져와서 추가. 내 파일을 덮어쓰지 않는다.
+
+### 실무 흐름 예시
+```
+1. flavor 버그 수정 → main 머지
+2. alcohol-api에서 git merge main 실행 (flavor 수정사항 반영)
+3. 로컬에서 테스트 확인
+4. alcohol-api → main 머지
+```
+
+### 충돌(Conflict)이 나는 경우
+같은 파일을 양쪽(main과 내 브랜치)에서 동시에 수정했을 때만 발생.
+flavor와 alcohol은 건드리는 파일이 다르므로 충돌 가능성 거의 없음.
 
 ---
 
