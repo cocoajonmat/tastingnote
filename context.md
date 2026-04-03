@@ -13,7 +13,7 @@
 ## 엔티티 설계 확정
 
 ### User
-- Soft Delete 방식 (deleted_at 컬럼) ✅ 구현 완료
+- Soft Delete 방식 (deleted_at 컬럼) 
 - 회원탈퇴: ❌ 미구현
     - 탈퇴 시 deleted_at 기록 + 모든 노트 isPublic = false
     - 30일 유예 기간 후 Hard Delete 스케줄러로 완전 삭제
