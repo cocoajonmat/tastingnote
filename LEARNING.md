@@ -500,3 +500,236 @@ private Double rating;
 
 **`DECIMAL(2,1)`** — 전체 자릿수 2자리, 소수점 1자리. 즉 1.0 ~ 9.9 범위 저장 가능.
 H2, MySQL 둘 다 `DECIMAL` 타입을 지원하기 때문에 환경에 따라 코드 변경 불필요.
+
+---
+
+## N+1 쿼리 문제와 해결
+
+### N+1이란?
+목록을 조회할 때 연관 데이터를 가져오기 위해 쿼리가 N+1번 실행되는 현상.
+"1"은 목록 조회 쿼리, "N"은 각 항목마다 연관 데이터를 가져오는 쿼리.
+
+```
+노트 50개 목록 조회
+    → SELECT * FROM note (1번)
+    → SELECT * FROM users WHERE id = 1 (note[0]의 user)
+    → SELECT * FROM users WHERE id = 2 (note[1]의 user)
+    → ... (50번)
+    → SELECT * FROM alcohol WHERE id = 5 (note[0]의 alcohol)
+    → ... (50번)
+총 101번 쿼리
+```
+
+### 왜 LAZY 로딩을 쓰는데 이런 문제가?
+LAZY 로딩은 연관 데이터를 "실제로 접근할 때만" DB에서 가져옴.
+단건 조회처럼 연관 데이터가 필요 없는 경우엔 쿼리를 아예 안 보냄 → 효율적.
+
+문제는 목록 조회에서 루프를 돌 때:
+```java
+// 이 코드가 내부에서 실행되면
+notes.stream().map(NoteResponse::from)  // from() 안에서 note.getUser() 호출
+// → 각 note마다 SELECT * FROM users WHERE id = ? 실행
+```
+LAZY의 장점이 오히려 목록에서는 독이 됨.
+
+### 왜 EAGER로 바꾸면 안 되나?
+EAGER는 항상 JOIN을 강제함.
+```java
+// note 하나를 조회해도 항상 user와 alcohol을 JOIN해서 가져옴
+noteRepository.findById(noteId)
+// → SELECT * FROM note LEFT JOIN users LEFT JOIN alcohol ...
+```
+"note가 몇 개 있는지만 확인"하거나 "noteId만 필요한" 경우에도 불필요한 JOIN 발생.
+특히 연관 관계가 많은 엔티티에서 EAGER를 쓰면 쿼리가 거대해짐.
+
+### 해결: @EntityGraph
+LAZY는 유지하되, 목록 조회 메서드에만 "이 쿼리에서는 JOIN으로 한 번에 가져와"라고 지정.
+
+```java
+@EntityGraph(attributePaths = {"user", "alcohol"})
+List<Note> findAllByIsPublicTrueAndStatus(NoteStatus status);
+```
+
+결과:
+```sql
+-- @EntityGraph 적용 후
+SELECT n.*, u.*, a.*
+FROM note n
+LEFT JOIN users u ON n.user_id = u.id
+LEFT JOIN alcohol a ON n.alcohol_id = a.id
+WHERE n.is_public = true AND n.status = 'PUBLISHED'
+-- 101번 → 1번
+```
+
+### @EntityGraph vs JOIN FETCH 비교
+| | @EntityGraph | JOIN FETCH |
+|---|---|---|
+| 작성 방식 | 어노테이션 | JPQL 직접 작성 |
+| 코드 가독성 | 높음 | 낮음 (쿼리 직접 씀) |
+| 유연성 | 낮음 | 높음 (복잡한 조건 가능) |
+| 언제 쓰나 | Spring Data JPA 메서드와 함께 | 복잡한 조인 조건이 있을 때 |
+
+이 프로젝트처럼 메서드 이름 쿼리를 쓰는 경우엔 @EntityGraph가 더 깔끔함.
+
+---
+
+## FetchType.LAZY vs EAGER 정리
+
+| | LAZY | EAGER |
+|---|---|---|
+| 연관 데이터 로딩 시점 | 실제 접근할 때 | 항상 (조회 즉시) |
+| 단건 조회 | 효율적 | 불필요한 JOIN 발생 가능 |
+| 목록 조회 | N+1 주의 | JOIN 1번으로 해결되지만 항상 비용 발생 |
+| JPA 권장 | @ManyToOne 기본값 EAGER → 명시적으로 LAZY 설정 권장 | |
+
+**결론**: @ManyToOne은 항상 LAZY로 설정하고, 목록 조회가 필요한 곳에서만 @EntityGraph로 해결하는 게 가장 정교한 방식.
+
+---
+
+## 낙관적 락(Optimistic Lock) vs 비관적 락(Pessimistic Lock)
+
+### 왜 필요한가?
+같은 데이터를 여러 곳에서 동시에 수정하려 할 때 충돌이 발생함.
+예: 노트를 폰과 노트북에서 동시에 열고 둘 다 수정 후 저장 → 먼저 저장한 내용이 사라짐.
+
+### 비관적 락(Pessimistic Lock)
+"충돌이 자주 일어날 것"이라고 비관적으로 가정하고, 처음부터 잠금.
+```
+A가 note 42를 읽음 → DB에서 해당 레코드에 잠금(SELECT FOR UPDATE)
+B가 note 42를 읽으려 함 → A가 저장할 때까지 대기
+A 저장 완료 → 잠금 해제 → B가 읽을 수 있음
+```
+- 장점: 충돌이 절대 발생하지 않음
+- 단점: 대기 시간 발생, 잠금이 겹치면 데드락 위험, 트래픽 많을수록 병목
+
+### 낙관적 락(Optimistic Lock)
+"충돌이 드물 것"이라고 낙관적으로 가정하고, 잠금 없이 진행 후 저장 시 확인.
+```
+A가 note 42를 읽음 (version = 3)
+B가 note 42를 읽음 (version = 3)
+A가 먼저 저장 → version이 3인지 확인 → 맞음 → 저장 성공 → version = 4
+B가 나중에 저장 → version이 3인지 확인 → 실제는 4 → 불일치 → OptimisticLockException 발생
+→ 클라이언트에 "다른 곳에서 이미 수정됨, 새로고침 필요" 안내
+```
+- 장점: 평상시엔 잠금 없이 작동, 성능 부하 없음
+- 단점: 충돌 발생 시 재시도 로직이 클라이언트에 필요
+
+### 왜 TastingNote에서는 낙관적 락?
+노트 편집은 같은 노트를 두 곳에서 동시에 수정하는 경우가 드묾.
+충돌이 드문 상황에서 비관적 락으로 항상 DB 잠금을 거는 건 오버헤드.
+낙관적 락은 평상시 성능을 희생하지 않으면서 실제 충돌만 처리.
+
+### Spring JPA 구현
+```java
+// Note 엔티티에 추가
+@Version
+private Long version;
+// Hibernate가 자동으로 UPDATE 시 WHERE version = ? 조건 추가
+// 버전이 달라졌으면 OptimisticLockException 발생
+```
+
+---
+
+## 캐싱(Caching) 개념
+
+### 캐싱이란?
+자주 요청되는 데이터를 메모리(RAM)에 저장해두고, 같은 요청 시 DB까지 가지 않고 메모리에서 바로 응답하는 방식.
+
+```
+[캐싱 없을 때]
+유저 요청 → 서버 → DB 조회(수십 ms) → 응답
+
+[캐싱 있을 때 - 첫 번째 요청]
+유저 요청 → 서버 → DB 조회(수십 ms) → 메모리에 저장 → 응답
+
+[캐싱 있을 때 - 이후 같은 요청]
+유저 요청 → 서버 → 메모리에서 즉시 응답(수 μs)
+```
+
+DB: 수십 ms / 메모리: 수 μs → 수천 배 차이.
+
+### 어떤 데이터에 적합한가?
+캐싱은 **읽기가 많고 변경이 적은 데이터**에 효과적.
+
+| 데이터 | 캐싱 적합? | 이유 |
+|--------|-----------|------|
+| 술(Alcohol) 정보 | ✅ | 관리자만 수정, 변경 빈도 낮음 |
+| FlavorSuggestion 목록 | ✅ | 거의 바뀌지 않음 |
+| 공개 피드 | ❌ | 실시간으로 계속 바뀜 |
+| 내 노트 목록 | ❌ | 수정/삭제 빈번 |
+
+### 캐시 무효화(Cache Invalidation)
+캐싱의 핵심 어려움 — "언제 캐시를 지울 것인가".
+캐시가 살아있는 동안 원본 데이터가 바뀌면 유저에게 오래된 정보를 보여주게 됨.
+
+해결: 데이터가 바뀌는 시점에 관련 캐시를 명시적으로 삭제.
+```java
+@CacheEvict(value = "alcoholSearch", allEntries = true)
+public void addAlcohol(...) { ... }  // 술 추가 시 검색 캐시 전체 삭제
+```
+
+### 로컬 캐시 vs Redis
+**로컬 캐시(Spring Cache 기본)**: 서버 메모리에 저장.
+- 서버가 1대일 때 충분.
+- 서버가 여러 대이면 각 서버의 캐시가 달라지는 문제 발생.
+
+**Redis**: 별도 캐시 서버에 저장, 모든 서버가 공유.
+- 서버가 여러 대로 늘어날 때 필요.
+- 서버가 재시작돼도 캐시 유지 가능.
+
+TastingNote는 지금 서버 1대 → 로컬 캐시로 시작, 스케일아웃 시 Redis로 전환 예정.
+
+---
+
+## Full-Text Search vs LIKE 검색
+
+### LIKE 검색의 두 가지 문제
+
+**1. 성능 문제**
+```sql
+WHERE name LIKE '%블랙%'
+```
+앞에 `%`가 붙으면 인덱스를 쓸 수 없어서 테이블 전체를 처음부터 끝까지 읽음.
+술 DB가 수천 개 이상 되면 느려짐.
+
+**2. 품질 문제**
+모든 결과를 동등하게 취급 — "블랙라벨" 검색 시 정확히 일치하는 것과 부분 포함하는 것이 순서 없이 섞여 나옴.
+
+### Full-Text Search의 동작 방식
+DB가 미리 각 단어를 쪼개서 **역색인(Inverted Index)** 을 만들어 둠.
+
+```
+[역색인 예시]
+"조니워커" → [alcohol_id: 1]
+"블랙라벨" → [alcohol_id: 1]
+"블랙"     → [alcohol_id: 1, 3, 7]
+"라벨"     → [alcohol_id: 1, 2]
+```
+
+"블랙" 검색 시 → 역색인에서 "블랙" 바로 찾아서 [1, 3, 7] 반환.
+책의 색인에서 단어 찾는 것처럼 빠름 — 전체 스캔 불필요.
+
+### Relevance Score (관련도 점수)
+Full-Text Search는 각 결과에 점수를 매겨서 정렬 가능.
+- 제목에서 검색어와 정확히 일치 → 높은 점수
+- 부분 일치 또는 별칭에서 발견 → 낮은 점수
+
+Vivino가 이 방식으로 와인 검색 결과를 정렬함.
+
+### MySQL Full-Text Search 적용 방법
+```sql
+-- 컬럼에 FULLTEXT 인덱스 추가
+ALTER TABLE alcohol ADD FULLTEXT INDEX ft_name (name, name_ko);
+
+-- 검색 시
+SELECT *, MATCH(name, name_ko) AGAINST('블랙' IN BOOLEAN MODE) AS score
+FROM alcohol
+WHERE MATCH(name, name_ko) AGAINST('블랙' IN BOOLEAN MODE)
+ORDER BY score DESC;
+```
+MySQL 8.0 이상에서 별도 설치 없이 바로 사용 가능.
+
+### 단계적 전환 계획
+1단계: LIKE (현재) — 술 DB가 작을 때
+2단계: MySQL Full-Text Search — 수천 개 이상, 검색 품질 개선 필요할 때
+3단계: Elasticsearch — 수십만 개 이상, 복잡한 검색 로직 필요할 때 (현재 계획 없음)

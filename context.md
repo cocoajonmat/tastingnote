@@ -194,7 +194,8 @@ com.dongjin.tastingnote
 - Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
-- 현재 작업 브랜치: feature/jwt-auth → main 머지 완료 (2026-04-02)
+- feature/jwt-auth → main 머지 완료 (2026-04-02)
+- 현재 작업 브랜치: feature/alcohol-api (미머지)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
 - FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
@@ -222,6 +223,11 @@ com.dongjin.tastingnote
      - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
      - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
 4. LikeService / LikeController
+   - **나중에 할 것**: Tag, Like, 피드 API 완성 후 N+1 문제 해결
+     - 로컬에서 노트 100개 테스트 데이터 삽입
+     - Spring Boot 로그에서 쿼리 수 직접 확인
+     - NoteRepository 목록 조회 메서드에 @EntityGraph 적용
+     - 101번 → 1번으로 줄어드는 것 로그로 확인
 5. NoteImage S3 업로드
 6. 소셜 로그인 (OAuth2)
 
