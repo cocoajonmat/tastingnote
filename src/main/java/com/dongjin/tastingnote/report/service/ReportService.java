@@ -31,6 +31,10 @@ public class ReportService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
 
+        if (note.getUser().getId().equals(reporterId)) {
+            throw new IllegalArgumentException("본인의 노트는 신고할 수 없습니다");
+        }
+
         reportRepository.save(Report.builder()
                 .reporter(reporter)
                 .note(note)

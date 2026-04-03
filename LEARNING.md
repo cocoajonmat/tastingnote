@@ -174,6 +174,80 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 ---
 
+## 백엔드 권한 검증이 항상 필요한 이유
+
+### "Never trust the client"
+프론트에서 버튼을 안 보여줘도, 누구든 Postman이나 curl로 API를 직접 호출할 수 있음.
+```
+PATCH /api/notes/42   ← 다른 사람 노트 ID
+Authorization: Bearer {내 토큰}
+```
+프론트 UI는 "보여주기"일 뿐이고, 진짜 보안은 항상 백엔드에서 해야 함.
+
+### TastingNote에 적용한 것
+- 노트 수정/삭제/발행/되돌리기: `note.getUser().getId().equals(userId)` 체크
+- 비공개(isPublic=false) 또는 DRAFT 노트: 본인 외 조회 차단
+- 신고: 자기 노트는 신고 불가
+
+### 패턴
+```java
+Note note = noteRepository.findById(noteId)
+        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+if (!note.getUser().getId().equals(userId)) {
+    throw new IllegalArgumentException("본인의 노트만 수정할 수 있습니다");
+}
+```
+리소스 조회 → 소유자 확인 → 비즈니스 로직 순서로 항상 처리.
+
+---
+
+## DB 인덱스와 LIKE 검색 성능
+
+### 인덱스란?
+DB가 데이터를 빠르게 찾기 위해 만들어두는 정렬된 목록. 책의 목차와 같음.
+목차가 있으면 원하는 페이지를 바로 찾을 수 있지만, 목차가 없으면 처음부터 끝까지 다 읽어야 함.
+
+### LIKE 검색과 인덱스
+```sql
+-- 인덱스 사용 가능 (앞부분이 고정)
+WHERE name LIKE 'John%'    -- "John으로 시작하는 것" → 목차에서 John 찾아서 거기서부터 읽으면 됨
+
+-- 인덱스 사용 불가 (앞이 불명확)
+WHERE name LIKE '%John%'   -- "어딘가에 John이 포함된 것" → 전체를 처음부터 끝까지 다 읽어야 함 (풀 테이블 스캔)
+```
+
+현재 `searchByKeyword`는 `%:keyword%` 방식이라 데이터가 많아지면 느려짐.
+술 DB는 수천 개 수준이라 지금은 체감 없음. 수십만 개가 되면 전환 필요.
+
+### 나중에 전환할 MySQL Full-Text Search
+DB가 단어 단위로 별도 인덱스를 만들어두는 방식. LIKE보다 훨씬 빠름.
+```sql
+-- LIKE 방식 (지금)
+WHERE name LIKE '%블랙%'              -- 전체 스캔
+
+-- Full-Text Search 방식 (나중에)
+WHERE MATCH(name) AGAINST('블랙')    -- 단어 인덱스 조회
+```
+전환 시점: 데이터가 많아져서 검색 속도가 느려진다고 느껴질 때.
+
+---
+
+## @RequestParam 필수/선택 옵션
+
+```java
+// 필수 (기본값) — 파라미터 없으면 400 에러
+@RequestParam AlcoholCategory category
+
+// 선택 — 파라미터 없으면 null
+@RequestParam(required = false) AlcoholCategory category
+```
+
+현재 `GET /api/alcohols`는 category가 필수라서 카테고리 없이 전체 조회 불가.
+나중에 "전체 술 목록" 기능이 필요하면 `required = false`로 바꾸고,
+category가 null이면 전체 반환, 있으면 필터링하는 방식으로 확장하면 됨.
+
+---
+
 ## GlobalExceptionHandler (common/exception/GlobalExceptionHandler.java)
 
 ### 왜 만들었나?

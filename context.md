@@ -120,6 +120,7 @@
 com.dongjin.tastingnote
 ├── user/entity/User.java
 ├── user/entity/RefreshToken.java
+├── user/entity/Provider.java
 ├── user/repository/UserRepository.java
 ├── user/repository/RefreshTokenRepository.java
 ├── user/service/UserService.java
@@ -129,18 +130,28 @@ com.dongjin.tastingnote
 ├── user/dto/TokenResponse.java
 ├── alcohol/entity/Alcohol.java
 ├── alcohol/entity/AlcoholAlias.java
+├── alcohol/entity/AlcoholCategory.java
+├── alcohol/repository/AlcoholRepository.java
+├── alcohol/dto/AlcoholResponse.java
+├── alcohol/service/AlcoholService.java
+├── alcohol/controller/AlcoholController.java
 ├── note/entity/Note.java
 ├── note/entity/NoteImage.java
 ├── note/entity/Like.java
+├── note/entity/LikeType.java
+├── note/entity/NoteStatus.java
+├── note/repository/NoteRepository.java
+├── note/service/NoteService.java
+├── note/controller/NoteController.java
+├── note/dto/NoteCreateRequest.java
+├── note/dto/NoteUpdateRequest.java
+├── note/dto/NoteResponse.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
 ├── flavor/entity/FlavorSuggestion.java
 ├── flavor/repository/FlavorSuggestionRepository.java
 ├── flavor/service/FlavorSuggestionService.java
 ├── flavor/controller/FlavorSuggestionController.java
-├── alcohol/dto/AlcoholResponse.java
-├── alcohol/service/AlcoholService.java
-├── alcohol/controller/AlcoholController.java
 ├── report/entity/Report.java
 ├── report/entity/ReportReason.java
 ├── report/entity/ReportStatus.java
@@ -148,10 +159,13 @@ com.dongjin.tastingnote
 ├── report/service/ReportService.java
 ├── report/controller/ReportController.java
 ├── report/dto/ReportRequest.java
+├── common/BaseEntity.java
 ├── common/response/ApiResponse.java
 ├── common/exception/GlobalExceptionHandler.java
 ├── common/jwt/JwtTokenProvider.java
-└── common/jwt/JwtAuthenticationFilter.java
+├── common/jwt/JwtAuthenticationFilter.java
+├── common/config/SecurityConfig.java
+└── common/config/SwaggerConfig.java
 
 ## 공통
 - 모든 엔티티는 BaseEntity 상속 (createdAt, updatedAt)
@@ -184,6 +198,11 @@ com.dongjin.tastingnote
 - feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
 - AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
 - GlobalExceptionHandler 구현 완료 (feature/alcohol-api, 2026-04-03)
+- 보안 이슈 수정 완료 (feature/alcohol-api, 2026-04-03)
+  - 노트 수정/삭제/발행/되돌리기에 본인 확인 추가
+  - 비공개/DRAFT 노트 타인 조회 차단
+  - 자기 노트 신고 방지
+  - SecurityConfig 공개 피드(/api/notes/public) 비로그인 허용 추가
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`

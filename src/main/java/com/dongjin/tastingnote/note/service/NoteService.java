@@ -56,9 +56,19 @@ public class NoteService {
     }
 
     // 노트 단건 조회
-    public NoteResponse getNote(Long noteId) {
+    public NoteResponse getNote(Long requesterId, Long noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+
+        boolean isOwner = note.getUser().getId().equals(requesterId);
+
+        if (note.getStatus() == NoteStatus.DRAFT && !isOwner) {
+            throw new IllegalArgumentException("접근할 수 없는 노트입니다");
+        }
+        if (!note.getIsPublic() && !isOwner) {
+            throw new IllegalArgumentException("접근할 수 없는 노트입니다");
+        }
+
         return NoteResponse.from(note);
     }
 
@@ -85,9 +95,12 @@ public class NoteService {
 
     // 노트 수정
     @Transactional
-    public NoteResponse updateNote(Long noteId, NoteUpdateRequest request) {
+    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+        if (!note.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 노트만 수정할 수 있습니다");
+        }
 
         note.update(
                 request.getTitle(),
@@ -106,27 +119,36 @@ public class NoteService {
 
     // 노트 발행
     @Transactional
-    public NoteResponse publishNote(Long noteId) {
+    public NoteResponse publishNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+        if (!note.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 노트만 발행할 수 있습니다");
+        }
         note.publish();
         return NoteResponse.from(note);
     }
 
     // 임시저장으로 되돌리기
     @Transactional
-    public NoteResponse unpublishNote(Long noteId) {
+    public NoteResponse unpublishNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+        if (!note.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 노트만 되돌릴 수 있습니다");
+        }
         note.saveDraft();
         return NoteResponse.from(note);
     }
 
     // 노트 삭제
     @Transactional
-    public void deleteNote(Long noteId) {
+    public void deleteNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+        if (!note.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("본인의 노트만 삭제할 수 있습니다");
+        }
         noteRepository.delete(note);
     }
 }
