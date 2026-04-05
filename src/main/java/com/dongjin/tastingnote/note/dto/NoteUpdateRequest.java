@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -15,8 +17,8 @@ public class NoteUpdateRequest {
     @NotBlank(message = "제목은 필수입니다")
     private String title;
 
-    private String taste;
-    private String aroma;
+    private List<Long> tasteIds = new ArrayList<>();
+    private List<Long> aromaIds = new ArrayList<>();
     private String pairing;
 
     @Min(value = 1, message = "별점은 1.0 이상이어야 합니다")

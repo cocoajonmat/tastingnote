@@ -8,6 +8,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -19,8 +21,8 @@ public class NoteCreateRequest {
     @NotBlank(message = "제목은 필수입니다")
     private String title;
 
-    private String taste;
-    private String aroma;
+    private List<Long> tasteIds = new ArrayList<>();   // FlavorSuggestion ID 목록 (맛)
+    private List<Long> aromaIds = new ArrayList<>();   // FlavorSuggestion ID 목록 (향)
     private String pairing;
 
     @NotNull(message = "별점은 필수입니다")

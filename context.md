@@ -57,7 +57,7 @@
 - alcoholName 필드 (String, nullable) → DB에 없는 술 직접 입력
 - title → 필수
 - rating → 필수, 5점 만점 (1.0~5.0, 0.5단위) — DECIMAL(2,1) 타입
-- taste, aroma → 하이브리드 방식 (제안 목록 + 자유 입력 둘 다 허용)
+- taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
 - drankAt → 선택
@@ -65,6 +65,12 @@
 - NoteStatus: DRAFT(임시저장) / PUBLISHED(발행) 구분 유지
     - DRAFT: 임시저장 상태, isPublic 토글 불가
     - PUBLISHED: 발행 상태, isPublic 토글 가능
+
+### NoteFlavor (새 테이블 추가) ✅ 구현 완료
+- Note ↔ FlavorSuggestion 다대다 중간 테이블
+- FlavorType: TASTE / AROMA 구분
+- uniqueConstraint(note_id, flavor_id, type) — 같은 노트에 같은 맛/향 중복 불가
+- 이유: Vivino처럼 선택 목록에서만 입력 → 데이터 일관성 확보, 술 상세 페이지/Discovery 통계 가능
 
 ### NoteImage
 - 저장 위치: AWS S3
@@ -76,10 +82,10 @@
 - 노트당 하나만 선택 가능
 - WANT("마셔보고 싶다")는 나중에 Alcohol 상세 페이지의 위시리스트 기능으로 분리 예정
 
-### FlavorSuggestion (새 테이블 추가) ✅ 구현 완료
-- taste/aroma 입력 시 제안 목록용
+### FlavorSuggestion ✅ 구현 완료
+- taste/aroma 선택 목록 데이터 (관리자가 등록)
 - 공통 목록 하나 (술 카테고리별 분리 안 함)
-- Note 엔티티 변경 없이 별도 테이블로 관리
+- NoteFlavor 중간 테이블을 통해 Note와 연결
 
 ### Report (신고) ✅ 구현 완료
 - 신고 사유: Enum (SPAM, INAPPROPRIATE, FALSE_INFO, OTHER)
@@ -149,7 +155,10 @@ com.dongjin.tastingnote
 ├── note/entity/Like.java
 ├── note/entity/LikeType.java
 ├── note/entity/NoteStatus.java
+├── note/entity/NoteFlavor.java
+├── note/entity/FlavorType.java
 ├── note/repository/NoteRepository.java
+├── note/repository/NoteFlavorRepository.java
 ├── note/service/NoteService.java
 ├── note/controller/NoteController.java
 ├── note/dto/NoteCreateRequest.java
@@ -216,6 +225,12 @@ com.dongjin.tastingnote
   - SecurityConfig 공개 피드(/api/notes/public) 비로그인 허용 추가
   - DRAFT 상태 노트 isPublic=true 설정 차단 (NoteService updateNote)
 - NoteCreateRequest rating @NotNull 필수 검증 추가 (feature/alcohol-api, 2026-04-03)
+- Note taste/aroma Vivino 방식으로 재설계 (feature/note-flavor-redesign, 2026-04-05)
+  - Note 엔티티 taste/aroma String 필드 제거
+  - NoteFlavor 중간 테이블 추가 (FlavorType: TASTE/AROMA)
+  - NoteCreateRequest/UpdateRequest: tasteIds, aromaIds(List<Long>)로 변경
+  - NoteResponse: tastes, aromas(List<String>)로 변경
+  - NoteService: saveFlavors(), 수정 시 기존 삭제 후 재저장
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`

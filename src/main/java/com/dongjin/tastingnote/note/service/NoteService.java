@@ -2,11 +2,16 @@ package com.dongjin.tastingnote.note.service;
 
 import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
+import com.dongjin.tastingnote.flavor.entity.FlavorSuggestion;
+import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
+import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
+import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
+import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
@@ -22,8 +27,10 @@ import java.util.List;
 public class NoteService {
 
     private final NoteRepository noteRepository;
+    private final NoteFlavorRepository noteFlavorRepository;
     private final UserRepository userRepository;
     private final AlcoholRepository alcoholRepository;
+    private final FlavorSuggestionRepository flavorSuggestionRepository;
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
@@ -42,8 +49,6 @@ public class NoteService {
                 .alcohol(alcohol)
                 .alcoholName(request.getAlcoholName())
                 .title(request.getTitle())
-                .taste(request.getTaste())
-                .aroma(request.getAroma())
                 .pairing(request.getPairing())
                 .rating(request.getRating())
                 .description(request.getDescription())
@@ -52,7 +57,11 @@ public class NoteService {
                 .location(request.getLocation())
                 .build();
 
-        return NoteResponse.from(noteRepository.save(note));
+        noteRepository.save(note);
+        saveFlavors(note, request.getTasteIds(), request.getAromaIds());
+
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
+        return NoteResponse.from(note, flavors);
     }
 
     // 노트 단건 조회
@@ -69,27 +78,28 @@ public class NoteService {
             throw new IllegalArgumentException("접근할 수 없는 노트입니다");
         }
 
-        return NoteResponse.from(note);
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
+        return NoteResponse.from(note, flavors);
     }
 
     // 내 노트 전체 조회
     public List<NoteResponse> getMyNotes(Long userId) {
         return noteRepository.findAllByUserId(userId).stream()
-                .map(NoteResponse::from)
+                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
 
     // 내 노트 상태별 조회 (DRAFT or PUBLISHED)
     public List<NoteResponse> getMyNotesByStatus(Long userId, NoteStatus status) {
         return noteRepository.findAllByUserIdAndStatus(userId, status).stream()
-                .map(NoteResponse::from)
+                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
 
     // 공개 노트 전체 조회 (소셜 피드)
     public List<NoteResponse> getPublicNotes() {
         return noteRepository.findAllByIsPublicTrueAndStatus(NoteStatus.PUBLISHED).stream()
-                .map(NoteResponse::from)
+                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
 
@@ -107,8 +117,6 @@ public class NoteService {
 
         note.update(
                 request.getTitle(),
-                request.getTaste(),
-                request.getAroma(),
                 request.getPairing(),
                 request.getRating(),
                 request.getDescription(),
@@ -117,7 +125,11 @@ public class NoteService {
                 request.getLocation()
         );
 
-        return NoteResponse.from(note);
+        noteFlavorRepository.deleteAllByNoteId(noteId);
+        saveFlavors(note, request.getTasteIds(), request.getAromaIds());
+
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
+        return NoteResponse.from(note, flavors);
     }
 
     // 노트 발행
@@ -129,7 +141,8 @@ public class NoteService {
             throw new IllegalArgumentException("본인의 노트만 발행할 수 있습니다");
         }
         note.publish();
-        return NoteResponse.from(note);
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
+        return NoteResponse.from(note, flavors);
     }
 
     // 임시저장으로 되돌리기
@@ -141,7 +154,8 @@ public class NoteService {
             throw new IllegalArgumentException("본인의 노트만 되돌릴 수 있습니다");
         }
         note.saveDraft();
-        return NoteResponse.from(note);
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
+        return NoteResponse.from(note, flavors);
     }
 
     // 노트 삭제
@@ -152,6 +166,29 @@ public class NoteService {
         if (!note.getUser().getId().equals(userId)) {
             throw new IllegalArgumentException("본인의 노트만 삭제할 수 있습니다");
         }
+        noteFlavorRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
+    }
+
+    // FlavorSuggestion ID 목록으로 NoteFlavor 저장
+    private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
+        for (Long flavorId : tasteIds) {
+            FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 맛/향입니다: " + flavorId));
+            noteFlavorRepository.save(NoteFlavor.builder()
+                    .note(note)
+                    .flavor(flavor)
+                    .type(FlavorType.TASTE)
+                    .build());
+        }
+        for (Long flavorId : aromaIds) {
+            FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
+                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 맛/향입니다: " + flavorId));
+            noteFlavorRepository.save(NoteFlavor.builder()
+                    .note(note)
+                    .flavor(flavor)
+                    .type(FlavorType.AROMA)
+                    .build());
+        }
     }
 }

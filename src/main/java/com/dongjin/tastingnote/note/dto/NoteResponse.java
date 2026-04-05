@@ -1,12 +1,15 @@
 package com.dongjin.tastingnote.note.dto;
 
+import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
+import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Builder
@@ -17,8 +20,8 @@ public class NoteResponse {
     private Long alcoholId;
     private String alcoholName;
     private String title;
-    private String taste;
-    private String aroma;
+    private List<String> tastes;
+    private List<String> aromas;
     private String pairing;
     private Double rating;
     private String description;
@@ -29,15 +32,25 @@ public class NoteResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static NoteResponse from(Note note) {
+    public static NoteResponse from(Note note, List<NoteFlavor> flavors) {
+        List<String> tastes = flavors.stream()
+                .filter(f -> f.getType() == FlavorType.TASTE)
+                .map(f -> f.getFlavor().getName())
+                .toList();
+
+        List<String> aromas = flavors.stream()
+                .filter(f -> f.getType() == FlavorType.AROMA)
+                .map(f -> f.getFlavor().getName())
+                .toList();
+
         return NoteResponse.builder()
                 .id(note.getId())
                 .userId(note.getUser().getId())
                 .alcoholId(note.getAlcohol() != null ? note.getAlcohol().getId() : null)
                 .alcoholName(note.getAlcoholName())
                 .title(note.getTitle())
-                .taste(note.getTaste())
-                .aroma(note.getAroma())
+                .tastes(tastes)
+                .aromas(aromas)
                 .pairing(note.getPairing())
                 .rating(note.getRating())
                 .description(note.getDescription())

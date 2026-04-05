@@ -743,6 +743,39 @@ MySQL 8.0 이상에서 별도 설치 없이 바로 사용 가능.
 
 ---
 
+## 다대다(M:N) 관계와 중간 테이블
+
+### 언제 필요한가
+하나의 Note에 여러 FlavorSuggestion이 붙을 수 있고, 하나의 FlavorSuggestion이 여러 Note에 붙을 수 있을 때 — 이게 다대다 관계.
+
+### JPA @ManyToMany를 쓰지 않는 이유
+JPA가 자동으로 중간 테이블을 만들어주지만:
+- 중간 테이블에 컬럼을 추가할 수 없음 (예: type, createdAt)
+- 중간 테이블을 직접 조회/삭제하기 어려움
+- 실무에서는 거의 사용 안 함
+
+### 직접 중간 엔티티를 만드는 방식 (이 프로젝트 선택)
+```
+Note (1) ──── (N) NoteFlavor (N) ──── (1) FlavorSuggestion
+                  ┌──────────────┐
+                  │ note_id      │
+                  │ flavor_id    │
+                  │ type (TASTE/AROMA) │
+                  └──────────────┘
+```
+- NoteFlavor가 독립적인 엔티티라서 직접 조회/삭제 가능
+- type 컬럼으로 맛(TASTE)과 향(AROMA)을 한 테이블에서 구분
+- uniqueConstraint(note_id, flavor_id, type)으로 같은 노트에 같은 맛/향 중복 방지
+
+### 왜 Vivino 방식(선택만)을 선택했나
+자유 텍스트로 저장하면 "바닐라", "바닐라향", "vanilla"가 모두 다른 데이터로 쌓임.
+선택 전용으로 하면 데이터가 일관되어서:
+- "이 술에서 바닐라 향을 느낀 사람이 몇 명인지" 집계 가능
+- Discovery 기능("바닐라 향이 난다고 기록한 노트들")이 정확하게 동작
+- 술 상세 페이지의 맛/향 분포 차트 구현 가능
+
+---
+
 ## Pull Request (PR)
 
 ### PR이란?
