@@ -210,7 +210,7 @@ com.dongjin.tastingnote
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
 - feature/jwt-auth → main 머지 완료 (2026-04-02)
-- 현재 작업 브랜치: feature/alcohol-api (미머지)
+- 현재 작업 브랜치: feature/note-flavor-redesign (미머지, feature/alcohol-api 전체 포함)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
 - feature/flavor-suggestion → main PR 머지 완료 (2026-04-05, GitHub 웹에서 첫 PR)
