@@ -72,8 +72,9 @@
 - 이미지 장수: 우선 1장으로 운영 (추후 변경 가능, 미확정)
 
 ### Like (반응)
-- LikeType: LIKE, LOVE, WANT, IMPRESSED, HELPFUL
+- LikeType: CHEERS 단일 타입으로 확정 (Untappd의 Toast와 동일 방식, 술 앱 정체성 반영)
 - 노트당 하나만 선택 가능
+- WANT("마셔보고 싶다")는 나중에 Alcohol 상세 페이지의 위시리스트 기능으로 분리 예정
 
 ### FlavorSuggestion (새 테이블 추가) ✅ 구현 완료
 - taste/aroma 입력 시 제안 목록용
@@ -203,6 +204,7 @@ com.dongjin.tastingnote
 - 현재 작업 브랜치: feature/alcohol-api (미머지)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
+- feature/flavor-suggestion → main PR 머지 완료 (2026-04-05, GitHub 웹에서 첫 PR)
 - FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
 - feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
 - AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
@@ -218,25 +220,46 @@ com.dongjin.tastingnote
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
 
+0. **feature/alcohol-api → main PR 머지 대기 중** (flavor-suggestion 커밋 포함, PR로 머지 예정)
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
    - GET /api/alcohols/search?keyword= (name + nameKo + alias 통합 검색)
    - GET /api/alcohols?category= (카테고리별 목록)
    - GET /api/alcohols/{id} (단건 조회)
    - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
-3. TagService / TagController
+3. **AlcoholRequest (크라우드소싱)** ← 다음 작업
+   - 술 데이터 품질이 서비스의 기반이므로 Tag/Like보다 우선
+   - alcoholName 자유 입력 비율을 낮추기 위한 장치 (데이터 오염 방지)
+   - 초기 술 DB SQL 삽입(A안) + 크라우드소싱(B안) 조합으로 진행
+   - AlcoholRequest 엔티티 설계:
+     - name, nameKo, aliases, status, requestedBy(User), mergedToAlcoholId
+     - status: PENDING / APPROVED / MERGED / REJECTED
+   - 관리자 처리 액션 3가지:
+     - **승인 (신규 등록)**: 새로운 술 → Alcohol + Alias 생성
+     - **별칭으로 병합**: 이미 있는 술 → 기존 Alcohol에 alias만 추가 (mergedToAlcoholId 기록)
+     - **거절**: 장난/중복 등
+   - API 4개:
+     - POST /api/alcohol-requests — 유저: 술 등록 요청
+     - POST /api/admin/alcohol-requests/{id}/approve — 관리자: 승인
+     - POST /api/admin/alcohol-requests/{id}/merge?alcoholId= — 관리자: 별칭 병합
+     - POST /api/admin/alcohol-requests/{id}/reject — 관리자: 거절
+     - GET /api/admin/alcohol-requests?status=PENDING — 관리자: 대기 목록 조회
+   - 초반 운영: 어드민 페이지 없이 Swagger에서 관리자 API 호출
+   - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
+   - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
+4. TagService / TagController
    - **결정 필요**: Tag 엔티티에 `count` 필드가 있으나, context.md 확정 내용은 "NoteTag 개수 실시간 카운팅 방식 (Tag 테이블 컬럼 추가 없음)"
      - A안: count 컬럼 유지 — 추가/삭제 시 +1/-1, 조회 빠르지만 동기화 안 맞을 수 있음
      - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
      - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
-4. LikeService / LikeController
+5. LikeService / LikeController
    - **나중에 할 것**: Tag, Like, 피드 API 완성 후 N+1 문제 해결
      - 로컬에서 노트 100개 테스트 데이터 삽입
      - Spring Boot 로그에서 쿼리 수 직접 확인
      - NoteRepository 목록 조회 메서드에 @EntityGraph 적용
      - 101번 → 1번으로 줄어드는 것 로그로 확인
-5. NoteImage S3 업로드
-6. 소셜 로그인 (OAuth2)
+6. NoteImage S3 업로드
+7. 소셜 로그인 (OAuth2)
 
 ---
 

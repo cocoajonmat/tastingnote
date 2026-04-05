@@ -740,3 +740,35 @@ MySQL 8.0 이상에서 별도 설치 없이 바로 사용 가능.
 1단계: LIKE (현재) — 술 DB가 작을 때
 2단계: MySQL Full-Text Search — 수천 개 이상, 검색 품질 개선 필요할 때
 3단계: Elasticsearch — 수십만 개 이상, 복잡한 검색 로직 필요할 때 (현재 계획 없음)
+
+---
+
+## Pull Request (PR)
+
+### PR이란?
+"이 브랜치의 변경사항을 main에 넣어주세요"라는 **요청서**.
+feature 브랜치에서 개발 완료 후, main에 바로 머지하지 않고 PR을 통해 기록을 남기는 방식.
+
+### 왜 쓰는가?
+- **기록**: GitHub에 PR 페이지가 남아서 "어떤 변경이 왜 들어갔는지" 추적 가능
+- **코드 리뷰**: 팀원이 코드를 보고 댓글/승인 가능 (혼자 개발 시에도 기록용으로 유효)
+- **포트폴리오**: 면접관이 GitHub 볼 때 기능 단위 개발 이력이 명확히 보임
+
+### PR 만드는 방법 (GitHub 웹)
+1. GitHub 레포지토리 페이지 접속
+2. "Compare & pull request" 노란 배너 클릭 (또는 Pull requests 탭 → New pull request)
+3. `base: main` ← `compare: feature/브랜치명` 설정
+4. 제목 + 본문 작성 → Create pull request
+5. 하단 "Merge pull request" → "Confirm merge" 클릭
+
+### 머지 방식 3가지
+| 방식 | 설명 | 언제 쓰는가 |
+|---|---|---|
+| **Create a merge commit** | 머지 커밋 하나 추가, 기존 커밋 유지 | 기본값, 커밋이 의미 있는 단위일 때 |
+| **Squash and merge** | 여러 커밋을 1개로 합쳐서 머지 | 잡다한 커밋이 많을 때 깔끔하게 |
+| **Rebase and merge** | 커밋을 그대로 main에 얹음, 머지 커밋 없음 | 직선 히스토리를 원할 때 |
+
+### 파생 브랜치와 머지 순서
+feature/A에서 feature/B를 파생한 경우 (B가 A의 커밋을 포함):
+- B만 머지해도 A의 커밋이 자동으로 포함됨 (Git은 커밋 단위로 관리)
+- A를 먼저 머지해도 B 머지 시 중복 커밋이 들어가지 않음 (Git이 알아서 건너뜀)
