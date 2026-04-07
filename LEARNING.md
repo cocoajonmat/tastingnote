@@ -365,3 +365,94 @@ private Double rating;
 
 **`DECIMAL(2,1)`** — 전체 자릿수 2자리, 소수점 1자리. 즉 1.0 ~ 9.9 범위 저장 가능.
 H2, MySQL 둘 다 `DECIMAL` 타입을 지원하기 때문에 환경에 따라 코드 변경 불필요.
+
+---
+
+## Slack Webhook 알림 (2026-04-07)
+
+### Webhook이란?
+
+특정 이벤트가 발생했을 때 지정한 URL로 HTTP 요청을 자동으로 보내는 방식.
+Slack은 채널마다 Webhook URL을 제공하고, 그 URL로 POST 요청을 보내면 채널에 메시지가 와요.
+
+```
+서버에서 500 에러 발생
+    ↓
+NotificationService.sendSlackError() 호출
+    ↓
+RestTemplate으로 Slack Webhook URL에 HTTP POST
+    ↓
+Slack 채널에 알림 메시지 도착 🔔
+```
+
+---
+
+### `RestTemplate`
+
+Spring에서 외부 HTTP 요청을 보낼 때 쓰는 클래스.
+
+```java
+// POST 요청 보내기
+restTemplate.postForEntity(url, request, String.class);
+```
+
+`@Bean`으로 등록해서 `@RequiredArgsConstructor`로 주입받아 사용:
+```java
+// AppConfig.java
+@Bean
+public RestTemplate restTemplate() {
+    return new RestTemplate();
+}
+```
+
+**왜 Bean으로 등록하나?**
+`new RestTemplate()`을 직접 쓰면 매번 새 객체가 생성됨.
+Bean으로 등록하면 하나의 인스턴스를 재사용해서 더 효율적.
+
+---
+
+### `@Slf4j` — 로그 출력 어노테이션
+
+```java
+@Slf4j
+public class NotificationService {
+    log.warn("Slack 알림 전송 실패: {}", ex.getMessage());
+}
+```
+
+Lombok이 제공하는 어노테이션. `Logger` 객체를 자동으로 생성해줌.
+- `log.info()` — 일반 정보
+- `log.warn()` — 경고 (심각하지 않은 문제)
+- `log.error()` — 에러
+
+Slack 전송 실패 시 서버 에러로 이어지지 않도록 `try-catch`로 감싸고 `log.warn`으로만 기록.
+
+---
+
+### 환경변수로 민감 정보 관리
+
+Webhook URL처럼 외부에 노출되면 안 되는 값은 코드에 직접 쓰면 안 돼요.
+GitHub에 올라가면 누구나 볼 수 있기 때문.
+
+```yaml
+# application-local.yaml
+notification:
+  slack-webhook-url: ${SLACK_WEBHOOK_URL:}   # 환경변수에서 읽음, 없으면 빈 값
+```
+
+`${변수명:기본값}` 형식 — 환경변수가 없으면 기본값 사용.
+`:` 뒤에 아무것도 없으면 빈 문자열이 기본값.
+
+코드에서 읽기:
+```java
+@Value("${notification.slack-webhook-url:}")
+private String slackWebhookUrl;
+
+// URL이 없으면 전송 안 함 (로컬 개발 시 에러 방지)
+if (slackWebhookUrl == null || slackWebhookUrl.isBlank()) {
+    return;
+}
+```
+
+IntelliJ Run Configuration → Environment variables에 등록해서 사용.
+서버(prod)에서는 GitHub Secrets → 환경변수로 주입.
