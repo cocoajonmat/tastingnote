@@ -170,15 +170,34 @@ com.dongjin.tastingnote
 - Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
-- 현재 작업 브랜치: feature/jwt-auth → main 머지 완료 (2026-04-02)
 - GitHub Actions CI/CD 배포 성공 확인
-- 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
+- 개발 환경: 노트북 → 데스크탑 전환 완료
+- feature/flavor-suggestion → main PR 머지 완료 (PR #1, 2026-04-05)
+- FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료
+- AlcoholRepository/Service/Controller 구현 완료
+- GlobalExceptionHandler 구현 완료
+- 보안 이슈 수정 완료 (노트 본인 확인, 비공개 노트 조회 차단, 자기 노트 신고 방지)
+- feature/error-handling → main PR 머지 완료 (PR #2, 2026-04-07)
+  - ErrorCode enum (상태코드 + 에러코드 + 메시지 한 곳에서 관리)
+  - BusinessException 커스텀 예외 클래스
+  - ErrorResponse record DTO
+  - GlobalExceptionHandler 업데이트
+  - UserService, NoteService, ReportService → BusinessException으로 교체
+- feature/error-notification → main PR 머지 완료 (PR #3, 2026-04-07)
+  - NotificationService — 500 에러 발생 시 Slack Webhook 알림 전송
+  - AppConfig — RestTemplate Bean 등록
+  - SLACK_WEBHOOK_URL 환경변수로 관리
+- Note taste/aroma Vivino 방식으로 재설계 (feature/note-flavor-redesign, 미머지)
+  - Note 엔티티 taste/aroma String 필드 제거
+  - NoteFlavor 중간 테이블 추가 (FlavorType: TASTE/AROMA)
+  - NoteCreateRequest/UpdateRequest: tasteIds, aromaIds(List<Long>)로 변경
+  - NoteResponse: tastes, aromas(List<String>)로 변경
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
 
-1. FlavorSuggestion 엔티티 생성
-2. AlcoholService / AlcoholController
+1. **feature/note-flavor-redesign → main PR 머지** ← 바로 다음
+2. AlcoholRequest (크라우드소싱) — 유저 술 등록 요청 → 관리자 승인/병합/거절
 3. TagService / TagController
 4. LikeService / LikeController
 5. NoteImage S3 업로드
