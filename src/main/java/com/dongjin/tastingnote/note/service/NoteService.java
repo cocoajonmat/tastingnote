@@ -2,6 +2,8 @@ package com.dongjin.tastingnote.note.service;
 
 import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
+import com.dongjin.tastingnote.common.exception.BusinessException;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
@@ -29,12 +31,12 @@ public class NoteService {
     @Transactional
     public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Alcohol alcohol = null;
         if (request.getAlcoholId() != null) {
             alcohol = alcoholRepository.findById(request.getAlcoholId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 술입니다"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
         }
 
         Note note = Note.builder()
@@ -58,7 +60,7 @@ public class NoteService {
     // 노트 단건 조회
     public NoteResponse getNote(Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         return NoteResponse.from(note);
     }
 
@@ -87,7 +89,7 @@ public class NoteService {
     @Transactional
     public NoteResponse updateNote(Long noteId, NoteUpdateRequest request) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
         note.update(
                 request.getTitle(),
@@ -108,7 +110,7 @@ public class NoteService {
     @Transactional
     public NoteResponse publishNote(Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         note.publish();
         return NoteResponse.from(note);
     }
@@ -117,7 +119,7 @@ public class NoteService {
     @Transactional
     public NoteResponse unpublishNote(Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         note.saveDraft();
         return NoteResponse.from(note);
     }
@@ -126,7 +128,7 @@ public class NoteService {
     @Transactional
     public void deleteNote(Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         noteRepository.delete(note);
     }
 }
