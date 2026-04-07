@@ -2,6 +2,8 @@ package com.dongjin.tastingnote.note.service;
 
 import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
+import com.dongjin.tastingnote.common.exception.BusinessException;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.flavor.entity.FlavorSuggestion;
 import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
@@ -36,12 +38,12 @@ public class NoteService {
     @Transactional
     public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Alcohol alcohol = null;
         if (request.getAlcoholId() != null) {
             alcohol = alcoholRepository.findById(request.getAlcoholId())
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 술입니다"));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
         }
 
         Note note = Note.builder()
@@ -67,15 +69,15 @@ public class NoteService {
     // 노트 단건 조회
     public NoteResponse getNote(Long requesterId, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
         boolean isOwner = note.getUser().getId().equals(requesterId);
 
         if (note.getStatus() == NoteStatus.DRAFT && !isOwner) {
-            throw new IllegalArgumentException("접근할 수 없는 노트입니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         if (!note.getIsPublic() && !isOwner) {
-            throw new IllegalArgumentException("접근할 수 없는 노트입니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
 
         List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
@@ -107,12 +109,12 @@ public class NoteService {
     @Transactional
     public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         if (!note.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("본인의 노트만 수정할 수 있습니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         if (Boolean.TRUE.equals(request.getIsPublic()) && note.getStatus() == NoteStatus.DRAFT) {
-            throw new IllegalArgumentException("임시저장 상태에서는 공개 설정을 할 수 없습니다");
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
         note.update(
@@ -136,9 +138,9 @@ public class NoteService {
     @Transactional
     public NoteResponse publishNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         if (!note.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("본인의 노트만 발행할 수 있습니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         note.publish();
         List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
@@ -149,9 +151,9 @@ public class NoteService {
     @Transactional
     public NoteResponse unpublishNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         if (!note.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("본인의 노트만 되돌릴 수 있습니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         note.saveDraft();
         List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
@@ -162,9 +164,9 @@ public class NoteService {
     @Transactional
     public void deleteNote(Long userId, Long noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         if (!note.getUser().getId().equals(userId)) {
-            throw new IllegalArgumentException("본인의 노트만 삭제할 수 있습니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         noteFlavorRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
@@ -174,7 +176,7 @@ public class NoteService {
     private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
         for (Long flavorId : tasteIds) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 맛/향입니다: " + flavorId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()
                     .note(note)
                     .flavor(flavor)
@@ -183,7 +185,7 @@ public class NoteService {
         }
         for (Long flavorId : aromaIds) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
-                    .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 맛/향입니다: " + flavorId));
+                    .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()
                     .note(note)
                     .flavor(flavor)

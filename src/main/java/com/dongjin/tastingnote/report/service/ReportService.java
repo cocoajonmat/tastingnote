@@ -1,5 +1,7 @@
 package com.dongjin.tastingnote.report.service;
 
+import com.dongjin.tastingnote.common.exception.BusinessException;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.note.entity.Note;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
 import com.dongjin.tastingnote.report.dto.ReportRequest;
@@ -22,17 +24,17 @@ public class ReportService {
     @Transactional
     public void report(Long reporterId, Long noteId, ReportRequest request) {
         if (reportRepository.existsByReporterIdAndNoteId(reporterId, noteId)) {
-            throw new IllegalArgumentException("이미 신고한 노트입니다");
+            throw new BusinessException(ErrorCode.ALREADY_REPORTED);
         }
 
         User reporter = userRepository.findById(reporterId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 유저입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
         if (note.getUser().getId().equals(reporterId)) {
-            throw new IllegalArgumentException("본인의 노트는 신고할 수 없습니다");
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
 
         reportRepository.save(Report.builder()
