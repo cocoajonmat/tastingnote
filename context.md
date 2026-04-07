@@ -211,6 +211,13 @@ com.dongjin.tastingnote
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
 - feature/jwt-auth → main 머지 완료 (2026-04-02)
 - 현재 작업 브랜치: feature/note-flavor-redesign (미머지, feature/alcohol-api 전체 포함)
+- 공통 에러 처리 구조 추가 (feature/error-handling → main 머지 완료, 2026-04-07, PR #2)
+  - ErrorCode enum (HTTP 상태코드 + 에러코드 + 메시지 한 곳에서 관리)
+  - BusinessException 커스텀 예외 클래스
+  - ErrorResponse record DTO (success, errorCode, message)
+  - GlobalExceptionHandler 업데이트 (BusinessException 처리 추가)
+  - UserService, NoteService, ReportService: IllegalArgumentException → BusinessException 교체
+  - feature/note-flavor-redesign에 origin/main 머지 완료 (충돌 해결)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
 - feature/flavor-suggestion → main PR 머지 완료 (2026-04-05, GitHub 웹에서 첫 PR)

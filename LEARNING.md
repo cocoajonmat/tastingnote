@@ -805,3 +805,166 @@ feature 브랜치에서 개발 완료 후, main에 바로 머지하지 않고 PR
 feature/A에서 feature/B를 파생한 경우 (B가 A의 커밋을 포함):
 - B만 머지해도 A의 커밋이 자동으로 포함됨 (Git은 커밋 단위로 관리)
 - A를 먼저 머지해도 B 머지 시 중복 커밋이 들어가지 않음 (Git이 알아서 건너뜀)
+
+### 로컬 main vs origin/main 차이
+```
+git merge main        ← 내 컴퓨터에 있는 main 기준 (오래됐을 수 있음)
+git merge origin/main ← GitHub에 있는 main 기준 (최신)
+```
+PR 머지 후 다른 브랜치에서 main 내용을 가져올 때는 `git merge origin/main`이 안전.
+`git fetch origin` 먼저 실행하면 origin/main 정보가 갱신됨.
+
+### 머지 충돌(Conflict)이란?
+두 브랜치에서 **같은 파일의 같은 부분**을 서로 다르게 수정했을 때 Git이 어느 쪽을 쓸지 몰라서 사람에게 선택을 맡기는 것.
+
+```
+<<<<<<< HEAD          ← 내 브랜치(현재)의 코드
+현재 브랜치 코드
+=======
+머지하려는 브랜치의 코드
+>>>>>>> origin/main   ← 가져오려는 브랜치의 코드
+```
+
+해결 방법:
+1. 파일을 열어서 `<<<<<<<`, `=======`, `>>>>>>>` 마커를 모두 제거
+2. 최종적으로 남길 코드만 남김 (한쪽 선택 or 두 코드 합치기)
+3. `git add` → `git commit`
+
+---
+
+## 공통 에러 처리 구조 (2026-04-07)
+
+### 왜 만드나?
+
+기존에는 예외를 던질 때 이렇게만 했어요:
+
+```java
+throw new IllegalArgumentException("존재하지 않는 노트입니다");
+```
+
+이 방식의 문제:
+- `IllegalArgumentException`은 무조건 **400**으로 반환됨
+- "노트를 못 찾았다" → 404, "권한 없다" → 403이 맞지만 표현할 방법이 없음
+- 에러 메시지가 코드 여기저기에 흩어져 있어서 관리가 어려움
+
+---
+
+### 구조
+
+```
+ErrorCode (enum)          ← 에러 종류 목록 + 상태코드 + 메시지 한 곳에 관리
+BusinessException         ← ErrorCode를 담아서 던지는 커스텀 예외
+ErrorResponse (record)    ← 에러 발생 시 프론트에 보내는 응답 DTO
+GlobalExceptionHandler    ← BusinessException을 잡아서 응답으로 변환
+```
+
+---
+
+### `ErrorCode.java` — enum
+
+```java
+USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 유저입니다")
+EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다")
+FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "FORBIDDEN_ACCESS", "접근 권한이 없습니다")
+```
+
+각 에러마다 3가지 정보를 갖고 있음:
+- `HttpStatus` → HTTP 상태코드 (404, 409, 403 등)
+- `code` → 에러 식별 문자열 (프론트에서 분기 처리용)
+- `message` → 사람이 읽는 에러 메시지
+
+**HTTP 상태코드 기준:**
+| 코드 | 의미 | 언제 쓰나 |
+|---|---|---|
+| 400 | Bad Request | 입력값이 잘못됐을 때 |
+| 401 | Unauthorized | 로그인 안 됐거나 토큰이 잘못됐을 때 |
+| 403 | Forbidden | 로그인은 됐지만 권한이 없을 때 (남의 노트 수정 등) |
+| 404 | Not Found | 요청한 리소스가 없을 때 |
+| 409 | Conflict | 중복 데이터 (이미 있는 이메일, 이미 신고한 노트 등) |
+| 500 | Internal Server Error | 서버에서 예상 못한 오류 발생 |
+
+---
+
+### `BusinessException.java` — 커스텀 예외
+
+```java
+// 사용 전
+throw new IllegalArgumentException("존재하지 않는 노트입니다"); // 무조건 400
+
+// 사용 후
+throw new BusinessException(ErrorCode.NOTE_NOT_FOUND); // 자동으로 404
+```
+
+`RuntimeException`을 상속하기 때문에 `throws` 선언 없이 어디서든 던질 수 있음.
+
+---
+
+### `ErrorResponse.java` — record DTO
+
+```java
+public record ErrorResponse(boolean success, String errorCode, String message) {}
+```
+
+**record란?**
+Java 16에서 도입된 문법. 데이터를 담기만 하는 클래스를 한 줄로 선언할 수 있음.
+생성자, getter, equals, hashCode, toString 자동 생성.
+불변(immutable) 객체 — 한번 만들면 값 변경 불가.
+
+에러 응답 형태:
+```json
+{
+  "success": false,
+  "errorCode": "NOTE_NOT_FOUND",
+  "message": "존재하지 않는 노트입니다"
+}
+```
+
+`errorCode`가 있어서 프론트에서 `if (errorCode === 'INVALID_TOKEN') { 로그인페이지로이동() }` 같은 처리 가능.
+
+---
+
+### `GlobalExceptionHandler.java` — 예외 한 곳에서 처리
+
+`@RestControllerAdvice` — 모든 컨트롤러에서 발생하는 예외를 한 곳에서 잡는 어노테이션.
+
+```java
+// BusinessException 발생 시 → ErrorCode의 상태코드로 응답
+@ExceptionHandler(BusinessException.class)
+public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    ErrorCode errorCode = e.getErrorCode();
+    return ResponseEntity.status(errorCode.getStatus())
+            .body(ErrorResponse.of(errorCode));
+}
+
+// @Valid 검증 실패 시 → 400 + 어떤 필드가 잘못됐는지 메시지
+@ExceptionHandler(MethodArgumentNotValidException.class)
+...
+
+// 그 외 예상 못한 모든 예외 → 500
+@ExceptionHandler(Exception.class)
+...
+```
+
+**왜 한 곳에서 처리하나?**
+예외 처리 코드가 각 컨트롤러마다 흩어지면 유지보수가 어려움.
+`@RestControllerAdvice` 하나로 전체 예외를 일관되게 처리할 수 있음.
+
+---
+
+### 전체 흐름 요약
+
+```
+서비스 코드
+  throw new BusinessException(ErrorCode.NOTE_NOT_FOUND)
+        ↓
+GlobalExceptionHandler가 잡음
+        ↓
+ErrorCode에서 HttpStatus.NOT_FOUND(404) 꺼냄
+        ↓
+프론트에 응답:
+{
+  "success": false,
+  "errorCode": "NOTE_NOT_FOUND",
+  "message": "존재하지 않는 노트입니다"
+}
+```
