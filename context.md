@@ -161,6 +161,7 @@ com.dongjin.tastingnote
 ├── note/entity/FlavorType.java
 ├── note/repository/NoteRepository.java
 ├── note/repository/NoteFlavorRepository.java
+├── note/repository/NoteImageRepository.java
 ├── note/service/NoteService.java
 ├── note/controller/NoteController.java
 ├── note/dto/NoteCreateRequest.java
@@ -192,6 +193,25 @@ com.dongjin.tastingnote
 - @ManyToOne은 fetch = FetchType.LAZY
 - Lombok 사용
 - @NoArgsConstructor(access = AccessLevel.PROTECTED)
+
+## 개발 규칙 — 새 기능 구현 시 체크리스트
+
+### ErrorCode 추가 규칙
+새 기능을 구현할 때 필요한 ErrorCode를 함께 추가한다. 아래 목록을 보고 해당 기능 구현 시점에 반영할 것:
+
+| 기능 | 추가할 ErrorCode | HTTP |
+|------|----------------|------|
+| AlcoholRequest | `ALCOHOL_REQUEST_NOT_FOUND` | 404 |
+| Like | `ALREADY_LIKED` | 409 |
+| NoteImage (S3) | `IMAGE_UPLOAD_FAILED` | 500 |
+
+> ErrorCode는 비즈니스 로직 오류만 관리. 프레임워크 예외(타입 불일치 등)는 GlobalExceptionHandler에서 직접 처리.
+
+### 노트 삭제 시 연관 데이터 삭제 순서 (FK 제약 때문에 순서 중요)
+```
+Report → NoteImage → NoteFlavor → Note
+```
+> NoteImage S3 업로드 구현 시 S3에서도 파일 삭제 로직 추가 필요.
 
 ---
 
