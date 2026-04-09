@@ -196,6 +196,13 @@ com.dongjin.tastingnote
 
 ## 개발 규칙 — 새 기능 구현 시 체크리스트
 
+### 프론트엔드 개발 시작 전 반드시 추가할 것
+- **CORS 설정** — SecurityConfig에 추가 필요
+  - 이유: 브라우저는 프론트(예: localhost:3000)와 백엔드(예: localhost:8080) 주소가 다르면 API 호출을 막음
+  - 추가 위치: `SecurityConfig.filterChain()` 내부에 `.cors(...)` 설정
+
+
+
 ### ErrorCode 추가 규칙
 새 기능을 구현할 때 필요한 ErrorCode를 함께 추가한다. 아래 목록을 보고 해당 기능 구현 시점에 반영할 것:
 
