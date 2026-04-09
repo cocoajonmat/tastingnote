@@ -15,6 +15,7 @@ import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
+import com.dongjin.tastingnote.report.repository.ReportRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class NoteService {
     private final UserRepository userRepository;
     private final AlcoholRepository alcoholRepository;
     private final FlavorSuggestionRepository flavorSuggestionRepository;
+    private final ReportRepository reportRepository;
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
@@ -40,16 +42,12 @@ public class NoteService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Alcohol alcohol = null;
-        if (request.getAlcoholId() != null) {
-            alcohol = alcoholRepository.findById(request.getAlcoholId())
-                    .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
-        }
+        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
 
         Note note = Note.builder()
                 .user(user)
                 .alcohol(alcohol)
-                .alcoholName(request.getAlcoholName())
                 .title(request.getTitle())
                 .pairing(request.getPairing())
                 .rating(request.getRating())
@@ -117,7 +115,11 @@ public class NoteService {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
+        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+
         note.update(
+                alcohol,
                 request.getTitle(),
                 request.getPairing(),
                 request.getRating(),
@@ -168,6 +170,7 @@ public class NoteService {
         if (!note.getUser().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
+        reportRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
     }

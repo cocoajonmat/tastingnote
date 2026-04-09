@@ -25,11 +25,8 @@ public class Note extends BaseEntity {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "alcohol_id")
+    @JoinColumn(name = "alcohol_id", nullable = false)
     private Alcohol alcohol;
-
-    @Column(name = "alcohol_name")
-    private String alcoholName;
 
     @Column(nullable = false)
     private String title;
@@ -57,8 +54,9 @@ public class Note extends BaseEntity {
     private String location;
 
     // 노트 내용 수정
-    public void update(String title, String pairing, Double rating, String description,
+    public void update(Alcohol alcohol, String title, String pairing, Double rating, String description,
                        Boolean isPublic, LocalDate drankAt, String location) {
+        this.alcohol = alcohol;
         this.title = title;
         this.pairing = pairing;
         this.rating = rating;
