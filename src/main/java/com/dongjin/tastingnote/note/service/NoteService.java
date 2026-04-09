@@ -14,6 +14,7 @@ import com.dongjin.tastingnote.note.entity.Note;
 import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
+import com.dongjin.tastingnote.note.repository.NoteImageRepository;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
 import com.dongjin.tastingnote.report.repository.ReportRepository;
 import com.dongjin.tastingnote.user.entity.User;
@@ -31,6 +32,7 @@ public class NoteService {
 
     private final NoteRepository noteRepository;
     private final NoteFlavorRepository noteFlavorRepository;
+    private final NoteImageRepository noteImageRepository;
     private final UserRepository userRepository;
     private final AlcoholRepository alcoholRepository;
     private final FlavorSuggestionRepository flavorSuggestionRepository;
@@ -171,6 +173,7 @@ public class NoteService {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         reportRepository.deleteAllByNoteId(noteId);
+        noteImageRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
     }
