@@ -3,6 +3,8 @@ package com.dongjin.tastingnote.alcohol.service;
 import com.dongjin.tastingnote.alcohol.dto.AlcoholResponse;
 import com.dongjin.tastingnote.alcohol.entity.AlcoholCategory;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
+import com.dongjin.tastingnote.common.exception.BusinessException;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,6 @@ public class AlcoholService {
     public AlcoholResponse getById(Long id) {
         return alcoholRepository.findById(id)
                 .map(AlcoholResponse::from)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 술입니다"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
     }
 }
