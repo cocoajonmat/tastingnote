@@ -15,13 +15,16 @@ import java.util.List;
 @NoArgsConstructor
 public class NoteCreateRequest {
 
-    private Long alcoholId;   // DB에 있는 술 선택 시
-    private String alcoholName; // 직접 입력 시
+    @NotNull(message = "술은 필수입니다")
+    private Long alcoholId;
 
     @NotBlank(message = "제목은 필수입니다")
     private String title;
 
+    @NotNull(message = "tasteIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
     private List<Long> tasteIds = new ArrayList<>();   // FlavorSuggestion ID 목록 (맛)
+
+    @NotNull(message = "aromaIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
     private List<Long> aromaIds = new ArrayList<>();   // FlavorSuggestion ID 목록 (향)
     private String pairing;
 
