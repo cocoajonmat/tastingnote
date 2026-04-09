@@ -19,6 +19,7 @@ public class NoteResponse {
     private Long userId;
     private Long alcoholId;
     private String alcoholName;
+    private String alcoholNameKo;
     private String title;
     private List<String> tastes;
     private List<String> aromas;
@@ -46,8 +47,9 @@ public class NoteResponse {
         return NoteResponse.builder()
                 .id(note.getId())
                 .userId(note.getUser().getId())
-                .alcoholId(note.getAlcohol() != null ? note.getAlcohol().getId() : null)
-                .alcoholName(note.getAlcoholName())
+                .alcoholId(note.getAlcohol().getId())
+                .alcoholName(note.getAlcohol().getName())
+                .alcoholNameKo(note.getAlcohol().getNameKo())
                 .title(note.getTitle())
                 .tastes(tastes)
                 .aromas(aromas)
