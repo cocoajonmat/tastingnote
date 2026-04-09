@@ -37,7 +37,7 @@
 - AlcoholAlias 테이블 별도 (별칭 검색용)
     - 예: "블랙라벨", "JW Black" → "조니워커 블랙라벨"로 매칭
 - 술 검색 시 name + nameKo + AlcoholAlias 통합 검색
-- DB에 없는 술 → Note의 alcoholName 필드에 자유 텍스트 저장 (alcohol 필드 null)
+- DB에 없는 술 → AlcoholRequest 등록 요청 → 관리자 승인 후 노트 작성 가능 (엄격한 방식 확정)
 - 데이터 전략:
     - 1단계: SQL로 초기 데이터 미리 삽입 (자주 마시는 술 위주)
     - 2단계(추후): 유저 등록 요청 → 관리자 승인 방식 추가
@@ -53,8 +53,10 @@
     - Discovery 기능(Q3)과도 연결됨
 
 ### Note
-- alcohol 필드 (@ManyToOne, nullable) → DB에 있는 술
-- alcoholName 필드 (String, nullable) → DB에 없는 술 직접 입력
+- alcohol 필드 (@ManyToOne, nullable = false) → DB에 있는 술 필수 선택
+- alcoholName 자유입력 제거 — 엄격한 방식으로 변경 확정 (2026-04-09)
+  - 이유: 자유입력 허용 시 같은 술이 "조니워커", "JW Black" 등으로 제각각 저장돼 Discovery/통계/술 상세 페이지 기능 불가
+  - DB에 없는 술은 AlcoholRequest로 등록 요청 → 승인 후 노트 작성
 - title → 필수
 - rating → 필수, 5점 만점 (1.0~5.0, 0.5단위) — DECIMAL(2,1) 타입
 - taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
@@ -238,6 +240,19 @@ com.dongjin.tastingnote
   - NoteCreateRequest/UpdateRequest: tasteIds, aromaIds(List<Long>)로 변경
   - NoteResponse: tastes, aromas(List<String>)로 변경
   - NoteService: saveFlavors(), 수정 시 기존 삭제 후 재저장
+- 오늘 작업 (feature/note-flavor-redesign, 2026-04-09)
+  - AlcoholService.getById() IllegalArgumentException → BusinessException 수정
+  - NoteCreateRequest/UpdateRequest @NotNull 추가 (tasteIds, aromaIds, isPublic, rating)
+    - tasteIds/aromaIds: null 명시 입력 시 NPE 방지 (빈 배열은 허용)
+    - isPublic: nullable=false 컬럼이므로 null 저장 방지
+    - rating: 설계상 필수 항목인데 UpdateRequest에만 누락됐던 것 수정
+  - Note 엔티티 alcoholName 자유입력 필드 제거, alcohol nullable=false로 변경 (엄격한 방식 확정)
+  - NoteCreateRequest alcoholName 제거, alcoholId @NotNull 필수화
+  - NoteUpdateRequest alcoholId @NotNull 추가 (수정 시 술 변경도 가능)
+  - Note.update()에 Alcohol 파라미터 추가
+  - NoteResponse: alcoholName(자유입력) → alcoholName(공식 영문) + alcoholNameKo(공식 한글)
+  - ReportRepository.deleteAllByNoteId() 추가
+  - NoteService.deleteNote(): Report → NoteFlavor → Note 순서로 삭제 (FK 오류 수정)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
@@ -251,7 +266,7 @@ com.dongjin.tastingnote
    - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
 3. **AlcoholRequest (크라우드소싱)** ← 다음 작업
    - 술 데이터 품질이 서비스의 기반이므로 Tag/Like보다 우선
-   - alcoholName 자유 입력 비율을 낮추기 위한 장치 (데이터 오염 방지)
+   - alcoholName 자유입력 제거로 DB에 없는 술은 반드시 AlcoholRequest를 거쳐야 함 (엄격한 방식 확정)
    - 초기 술 DB SQL 삽입(A안) + 크라우드소싱(B안) 조합으로 진행
    - AlcoholRequest 엔티티 설계:
      - name, nameKo, aliases, status, requestedBy(User), mergedToAlcoholId

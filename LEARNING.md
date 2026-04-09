@@ -968,3 +968,64 @@ ErrorCode에서 HttpStatus.NOT_FOUND(404) 꺼냄
   "message": "존재하지 않는 노트입니다"
 }
 ```
+
+---
+
+## NullPointerException (NPE) 방어 — DTO @NotNull
+
+### NPE란?
+
+Java에서 `null`인 변수를 사용하려 할 때 발생하는 오류.
+
+```java
+List<Long> tasteIds = null;
+
+for (Long id : tasteIds) {  // 💥 NPE 발생! null을 순회할 수 없음
+    ...
+}
+```
+
+### 왜 발생했나?
+
+`NoteCreateRequest`, `NoteUpdateRequest`의 `tasteIds`, `aromaIds` 필드는 기본값으로 `new ArrayList<>()`를 가짐.
+하지만 클라이언트가 JSON에 `"tasteIds": null`을 **명시적으로** 보내면 Jackson이 기본값을 null로 덮어씀.
+그 결과 `NoteService.saveFlavors()` 내부 for-each에서 NPE 발생 → 서버 500 에러.
+
+```json
+// 이런 요청이 오면 서버가 NPE로 터짐
+{
+  "title": "조니워커",
+  "tasteIds": null,
+  "rating": 4.0
+}
+```
+
+### 원칙: 서버는 클라이언트를 믿으면 안 된다
+
+일반 사용자는 프론트 UI를 통해 정상적인 값을 보내지만,
+Swagger나 Postman으로 직접 API에 이상한 값을 보내는 경우를 항상 대비해야 함.
+서버가 NPE로 500 에러를 내는 것보다, 유효성 검사로 400 에러를 반환하는 게 훨씬 안전하고 명확함.
+
+### 해결: @NotNull + 빈 배열 허용
+
+맛/향 선택은 선택 항목(빈 리스트 허용, null만 금지).
+
+```java
+@NotNull(message = "tasteIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
+private List<Long> tasteIds = new ArrayList<>();
+```
+
+| 값 | 결과 |
+|----|------|
+| `null` | ❌ 400 Bad Request (차단) |
+| `[]` | ✅ 정상 처리 (맛/향 없이 저장) |
+| `[1, 3]` | ✅ 정상 처리 (선택한 맛/향 저장) |
+
+### @NotNull vs @NotEmpty 차이
+
+| 어노테이션 | null | 빈 리스트 [] |
+|-----------|------|------------|
+| `@NotNull` | ❌ 차단 | ✅ 허용 |
+| `@NotEmpty` | ❌ 차단 | ❌ 차단 |
+
+맛/향이 선택 항목이므로 `@NotNull`이 적절. 필수 항목으로 바꾸고 싶다면 `@NotEmpty`로 교체하면 됨.
