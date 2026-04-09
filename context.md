@@ -267,7 +267,7 @@ Report → NoteImage → NoteFlavor → Note
   - NoteCreateRequest/UpdateRequest: tasteIds, aromaIds(List<Long>)로 변경
   - NoteResponse: tastes, aromas(List<String>)로 변경
   - NoteService: saveFlavors(), 수정 시 기존 삭제 후 재저장
-- 오늘 작업 (feature/note-flavor-redesign, 2026-04-09)
+- feature/note-flavor-redesign, 2026-04-09
   - AlcoholService.getById() IllegalArgumentException → BusinessException 수정
   - NoteCreateRequest/UpdateRequest @NotNull 추가 (tasteIds, aromaIds, isPublic, rating)
     - tasteIds/aromaIds: null 명시 입력 시 NPE 방지 (빈 배열은 허용)
