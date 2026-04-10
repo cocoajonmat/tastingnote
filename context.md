@@ -332,6 +332,10 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - 응답 구조 개선 (2026-04-10)
     - NoteResponse tastes/aromas: List<String> → List<FlavorItem>(id+name) 변경 (수정 화면 복원 지원)
     - Note.pairing: @Column(columnDefinition = "TEXT") 추가 (VARCHAR 255 제한 제거)
+  - 추가 개선 (2026-04-10)
+    - AlcoholCategory.findByName(): 영문 카테고리명 매칭 추가 (whiskey, wine 등 영문 검색 가능)
+    - CustomAuthenticationEntryPoint: 미인증 요청 시 빈 응답 대신 JSON 에러 반환
+    - ErrorCode.UNAUTHORIZED 추가 ("로그인이 필요합니다")
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
