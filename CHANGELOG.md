@@ -1,0 +1,205 @@
+# 변경/개선 이유 기록
+
+코드를 왜 이렇게 바꿨는지를 기록하는 파일.
+context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
+이유가 필요한 결정은 여기에 남긴다.
+
+---
+
+## 2026-04-09 — Note 엔티티 alcoholName 자유입력 필드 제거
+
+**결정**: alcoholName String 필드 제거, alcohol @ManyToOne nullable=false로 변경 (엄격한 방식)
+
+**이유**: 자유입력 허용 시 같은 술이 "조니워커", "JW Black", "조니워커 블랙" 등 제각각 저장됨.
+이렇게 되면 "이 술을 마신 사람이 몇 명인지", "이 술의 평균 별점" 같은 기능이 불가능해짐.
+Discovery/술 상세 페이지/통계 등 핵심 기능이 처음부터 막히는 구조.
+
+**대안**: DB에 없는 술은 AlcoholRequest로 등록 요청 → 관리자 승인 후 노트 작성 가능.
+
+---
+
+## 2026-04-10 — AlcoholCategory에 한글명 추가
+
+**결정**: AlcoholCategory enum에 nameKo 필드와 findByNameKo() 메서드 추가
+
+**이유**: 검색창에 "위스키"를 입력해도 결과가 없었음.
+기존 검색은 name(영문) + nameKo(한글) + alias만 체크하고 카테고리명은 포함하지 않았음.
+AlcoholCategory enum이 WHISKEY처럼 영문이라 "위스키"와 매칭되지 않아서 해당 카테고리 전체가 누락됨.
+
+---
+
+## 2026-04-10 — FlavorSuggestion 응답에 id 포함
+
+**결정**: FlavorSuggestionResponse를 name(String)만 반환하던 것에서 id + name으로 변경
+
+**이유**: 노트 작성 시 클라이언트가 맛/향을 선택하면 해당 FlavorSuggestion의 id(tasteIds, aromaIds)를 보내야 함.
+id 없이 이름만 반환하면 클라이언트가 노트 저장 요청을 만들 수 없음.
+
+---
+
+## 2026-04-10 — 비로그인 유저 노트 상세 조회 허용
+
+**결정**: SecurityConfig에 RegexRequestMatcher("/api/notes/\\d+", "GET").permitAll() 추가.
+NoteController.getNote()에서 userId를 선택적으로 추출 (비로그인 시 null).
+
+**이유**: 서비스의 기본 방향이 공개 피드/노트 조회는 비로그인도 가능해야 함.
+기존에는 /api/notes/{noteId} GET도 인증 필요해서 비로그인 유저가 아무것도 볼 수 없었음.
+단, /api/notes/my와 충돌하지 않도록 숫자 ID만 허용하는 정규식 사용.
+
+---
+
+## 2026-04-10 — 비공개/DRAFT 노트 신고 차단
+
+**결정**: ReportService에서 note.getStatus() == DRAFT || !note.getIsPublic() 이면 403 반환
+
+**이유**: 비공개 노트나 임시저장 노트는 본인 외에 볼 수 없는 콘텐츠.
+신고 기능은 다른 유저가 볼 수 있는 공개 콘텐츠에 대해서만 의미 있음.
+비공개 노트를 신고할 수 있으면 노트 존재 여부가 간접적으로 노출되는 보안 문제도 있음.
+
+---
+
+## 2026-04-10 — reason=OTHER 시 reasonDetail 필수화
+
+**결정**: ReportService에서 reason == OTHER && reasonDetail이 null/blank이면 INVALID_INPUT 에러
+
+**이유**: OTHER(기타)는 정해진 사유 외의 신고를 위한 항목.
+reasonDetail 없이 OTHER를 선택하면 관리자가 어떤 문제인지 파악 불가 → 처리가 불가능한 신고가 DB에 쌓임.
+
+---
+
+## 2026-04-10 — 탈퇴 유저 토큰 재발급 차단
+
+**결정**: UserService.reissue()에서 refreshToken.getUser().getDeletedAt() != null이면 USER_NOT_FOUND 에러
+
+**이유**: Refresh Token은 30일간 유효한데, 탈퇴(deletedAt 기록) 후에도 기존 토큰으로 재발급이 가능했음.
+탈퇴한 유저가 Access Token을 계속 받을 수 있으면 탈퇴의 의미가 없음.
+로그인(login)은 이미 findByEmailAndDeletedAtIsNull로 차단되어 있지만, reissue는 이메일 조회를 거치지 않아 누락됨.
+
+---
+
+## 2026-04-10 — 닉네임 공백 검증 추가
+
+**결정**: SignUpRequest nickname 필드에 @Pattern(regexp = "^\\S+$") 추가
+
+**이유**: @NotBlank는 전체가 공백인 경우만 막음 (" " → 차단, "닉 네임" → 통과).
+닉네임 중간에 공백이 있으면 표시될 때 어색하고, 검색/자동완성 기능에서 예상치 못한 동작 가능.
+
+---
+
+## 2026-04-10 — 비밀번호 복잡도 검증 추가
+
+**결정**: SignUpRequest password 필드에 @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$") 추가
+
+**이유**: 8자 이상 조건(@Size)만으로는 "aaaaaaaa", "12345678" 같은 단순 비밀번호가 허용됨.
+최소한 영문자+숫자 조합을 강제해야 브루트포스 공격에 덜 취약함.
+특수문자는 강제하지 않음 — 입력 UX와 보안의 균형을 고려한 결정.
+
+---
+
+## 2026-04-10 — Swagger createNote 설명 오류 수정
+
+**결정**: NoteController createNote @Operation description에서 "status 필드로 DRAFT/PUBLISHED 선택 가능" 문구 제거
+
+**이유**: 실제 동작은 생성 시 항상 DRAFT로 저장되며, status 필드는 NoteCreateRequest에 존재하지 않음.
+설명과 실제 동작이 다르면 프론트(친구)가 없는 기능을 구현하려고 시간을 낭비할 수 있음.
+
+---
+
+## 2026-04-10 — 이메일 toLowerCase() 처리
+
+**결정**: signUp(), login()에서 이메일을 소문자로 정규화 후 저장/조회
+
+**이유**: DB collation(MySQL utf8mb4_general_ci)이 대소문자를 구분하지 않아 운영에서는 문제없지만,
+H2(로컬)는 대소문자를 구분해서 환경 간 동작이 달라짐. 또한 실무 관례상 이메일은 애플리케이션 레벨에서
+명시적으로 소문자 정규화하는 것이 DB 설정에 의존하지 않아 안전.
+
+---
+
+## 2026-04-10 — 술 검색 공백 키워드 방어 강화
+
+**결정**: AlcoholController search()에 @NotBlank 추가 (@Size(min=1)과 함께 사용)
+
+**이유**: @Size(min=1)만으로는 " "(공백 1개)를 길이 1로 허용해버림.
+공백 키워드로 검색 시 LIKE %  % 쿼리 → 전체 반환으로 빈 검색과 동일한 결과.
+@NotBlank는 공백만인 문자열을 차단하므로 함께 써야 완전히 방어됨.
+
+---
+
+## 2026-04-10 — createNote 시 isPublic 항상 false 고정
+
+**결정**: NoteService.createNote()에서 isPublic을 클라이언트 값 무시하고 항상 false로 저장
+
+**이유**: 노트는 생성 시 항상 DRAFT 상태. isPublic은 PUBLISHED 이후에만 의미 있음.
+클라이언트가 isPublic=true를 보내면 DRAFT인데 isPublic=true인 불일치 데이터가 생김.
+updateNote()에서는 DRAFT+isPublic=true를 차단하는 검증이 있었지만 createNote()에는 없어서 누락됐던 것.
+
+---
+
+## 2026-04-10 — unpublish 시 isPublic false로 초기화
+
+**결정**: Note.saveDraft()에서 isPublic도 false로 함께 변경
+
+**이유**: unpublish는 "임시저장으로 되돌리기"인데 isPublic=true가 유지되면
+다시 publish 시 즉시 공개 노출되어 사용자 입장에서 예상치 못한 동작.
+isPublic 설정은 PUBLISHED 상태에서 별도로 하는 것이 의미 있음.
+
+---
+
+## 2026-04-10 — 탈퇴 유저 닉네임 즉시 해제
+
+**결정**: UserRepository.existsByNickname() → existsByNicknameAndDeletedAtIsNull()로 변경
+
+**이유**: 이메일은 신고 누적 탈퇴 유저가 즉시 재가입해서 신고 기록을 우회하는 것을 막기 위해 30일 묶어둠.
+닉네임은 그런 보안적 이유가 없음. 탈퇴 유저 닉네임을 다른 사람이 못 쓰게 막으면 UX만 불편해짐.
+이메일과 닉네임은 성격이 달라서 동일한 규칙을 적용할 필요 없음.
+
+---
+
+## 2026-04-10 — 노트 title/location 길이 제한 추가
+
+**결정**: NoteCreateRequest, NoteUpdateRequest에 title @Size(max=100), location @Size(max=100) 추가
+
+**이유**: 제한 없으면 수천 자짜리 제목이 DB에 저장될 수 있음.
+제목은 UI에서 한 줄로 표시되므로 100자면 충분. 장소도 간단한 텍스트이므로 동일 기준 적용.
+description과 pairing은 자유 서술 필드(TEXT 컬럼)이므로 제한 없이 유지.
+
+---
+
+## 2026-04-10 — pairing 컬럼 TEXT로 변경
+
+**결정**: Note.java pairing 필드에 `@Column(columnDefinition = "TEXT")` 추가
+
+**이유**: description과 함께 pairing도 자유 서술 필드. 페어링 음식/안주를 자세히 적을 수 있어야 함.
+VARCHAR(255) 기본값으로는 긴 내용 저장 시 잘림. 글자 수 제한은 프론트 UI에서 UX로 처리.
+
+---
+
+## 2026-04-10 — reasonDetail 길이 제한 추가
+
+**결정**: ReportRequest reasonDetail에 `@Size(max=500)` 추가
+
+**이유**: OTHER 사유 입력 시 무제한 텍스트 저장 가능 → DB 저장 공격 벡터.
+500자면 충분히 상황 설명 가능. description/pairing과 달리 신고 사유는 간결해야 함.
+TEXT가 아닌 VARCHAR(500)으로 DB 컬럼도 자연스럽게 제한됨.
+
+---
+
+## 2026-04-10 — NoteResponse tastes/aromas에 id 포함
+
+**결정**: NoteResponse의 tastes/aromas를 `List<String>`에서 `List<FlavorItem>`(id + name)으로 변경
+
+**이유**: 노트 수정 화면에서 기존에 선택된 맛/향을 다시 표시하려면 FlavorSuggestion의 id가 필요함.
+id 없이 name만 있으면 수정 요청 시 tasteIds/aromaIds를 만들 수 없어서 프론트가 기존 선택값을 복원할 수 없음.
+
+---
+
+## 보류 결정 (추후 처리 예정)
+
+### 탈퇴 후 Access Token 유효 문제
+탈퇴해도 기존 Access Token 만료(1시간)까지 API 호출 가능.
+완벽히 막으려면 Redis 블랙리스트 필요 — 현재 규모에서 과함.
+탈퇴 기능 구현 시 Access Token 만료 시간 단축(15~30분)으로 피해 최소화 예정.
+
+### 로그인 브루트포스 방어
+로그인 실패 횟수 제한 없음. Rate limiting은 애플리케이션보다 인프라 레벨이 적합.
+서비스 오픈 전 Nginx 설정(`limit_req_zone`) 또는 AWS WAF로 처리 예정.

@@ -33,15 +33,16 @@ public class UserService {
 
     @Transactional
     public void signUp(SignUpRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String email = request.getEmail().toLowerCase();
+        if (userRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
-        if (userRepository.existsByNickname(request.getNickname())) {
+        if (userRepository.existsByNicknameAndDeletedAtIsNull(request.getNickname())) {
             throw new BusinessException(ErrorCode.NICKNAME_ALREADY_EXISTS);
         }
 
         User user = User.builder()
-                .email(request.getEmail())
+                .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .nickname(request.getNickname())
                 .birthDate(request.getBirthDate())
@@ -53,7 +54,7 @@ public class UserService {
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmailAndDeletedAtIsNull(request.getEmail())
+        User user = userRepository.findByEmailAndDeletedAtIsNull(request.getEmail().toLowerCase())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_LOGIN));
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
@@ -73,8 +74,14 @@ public class UserService {
             throw new BusinessException(ErrorCode.EXPIRED_TOKEN);
         }
 
+        User user = refreshToken.getUser();
         refreshTokenRepository.delete(refreshToken);
-        return issueTokens(refreshToken.getUser());
+
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        return issueTokens(user);
     }
 
     @Transactional

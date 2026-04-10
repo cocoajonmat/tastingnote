@@ -3,9 +3,11 @@ package com.dongjin.tastingnote.report.service;
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.note.entity.Note;
+import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
 import com.dongjin.tastingnote.report.dto.ReportRequest;
 import com.dongjin.tastingnote.report.entity.Report;
+import com.dongjin.tastingnote.report.entity.ReportReason;
 import com.dongjin.tastingnote.report.repository.ReportRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
@@ -33,8 +35,17 @@ public class ReportService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
+        if (note.getStatus() == NoteStatus.DRAFT || !note.getIsPublic()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
         if (note.getUser().getId().equals(reporterId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
+        if (request.getReason() == ReportReason.OTHER &&
+                (request.getReasonDetail() == null || request.getReasonDetail().isBlank())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
         reportRepository.save(Report.builder()

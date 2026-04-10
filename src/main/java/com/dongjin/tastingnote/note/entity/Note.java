@@ -31,6 +31,7 @@ public class Note extends BaseEntity {
     @Column(nullable = false)
     private String title;
 
+    @Column(columnDefinition = "TEXT")
     private String pairing;
 
     @Column(columnDefinition = "DECIMAL(2,1)")
@@ -74,5 +75,6 @@ public class Note extends BaseEntity {
     // 임시저장으로 되돌리기
     public void saveDraft() {
         this.status = NoteStatus.DRAFT;
+        this.isPublic = false;
     }
 }

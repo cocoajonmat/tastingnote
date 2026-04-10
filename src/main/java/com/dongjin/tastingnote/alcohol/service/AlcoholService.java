@@ -9,7 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -19,9 +22,21 @@ public class AlcoholService {
 
     @Transactional(readOnly = true)
     public List<AlcoholResponse> search(String keyword) {
-        return alcoholRepository.searchByKeyword(keyword).stream()
-                .map(AlcoholResponse::from)
-                .toList();
+        String trimmed = keyword.trim();
+        Set<AlcoholResponse> results = new LinkedHashSet<>(
+                alcoholRepository.searchByKeyword(trimmed).stream()
+                        .map(AlcoholResponse::from)
+                        .toList()
+        );
+
+        AlcoholCategory matchedCategory = AlcoholCategory.findByNameKo(trimmed);
+        if (matchedCategory != null) {
+            alcoholRepository.findAllByCategory(matchedCategory).stream()
+                    .map(AlcoholResponse::from)
+                    .forEach(results::add);
+        }
+
+        return new ArrayList<>(results);
     }
 
     @Transactional(readOnly = true)

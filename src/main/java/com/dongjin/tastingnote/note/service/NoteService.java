@@ -17,6 +17,7 @@ import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
 import com.dongjin.tastingnote.note.repository.NoteImageRepository;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
 import com.dongjin.tastingnote.report.repository.ReportRepository;
+import com.dongjin.tastingnote.tag.repository.NoteTagRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,10 +38,20 @@ public class NoteService {
     private final AlcoholRepository alcoholRepository;
     private final FlavorSuggestionRepository flavorSuggestionRepository;
     private final ReportRepository reportRepository;
+    private final NoteTagRepository noteTagRepository;
+
+    // rating 0.5 단위 검증 (1.0, 1.5, 2.0 ... 5.0)
+    private void validateRating(Double rating) {
+        if (Math.round(rating * 10) % 5 != 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+    }
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
     public NoteResponse createNote(Long userId, NoteCreateRequest request) {
+        validateRating(request.getRating());
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -54,7 +65,7 @@ public class NoteService {
                 .pairing(request.getPairing())
                 .rating(request.getRating())
                 .description(request.getDescription())
-                .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
+                .isPublic(false) // 생성 시 항상 비공개, 발행 후 isPublic 변경 가능
                 .drankAt(request.getDrankAt())
                 .location(request.getLocation())
                 .build();
@@ -71,7 +82,7 @@ public class NoteService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
-        boolean isOwner = note.getUser().getId().equals(requesterId);
+        boolean isOwner = requesterId != null && note.getUser().getId().equals(requesterId);
 
         if (note.getStatus() == NoteStatus.DRAFT && !isOwner) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
@@ -113,6 +124,7 @@ public class NoteService {
         if (!note.getUser().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
+        validateRating(request.getRating());
         if (Boolean.TRUE.equals(request.getIsPublic()) && note.getStatus() == NoteStatus.DRAFT) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
@@ -175,12 +187,13 @@ public class NoteService {
         reportRepository.deleteAllByNoteId(noteId);
         noteImageRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
+        noteTagRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
     }
 
     // FlavorSuggestion ID 목록으로 NoteFlavor 저장
     private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
-        for (Long flavorId : tasteIds) {
+        for (Long flavorId : tasteIds.stream().distinct().toList()) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()
@@ -189,7 +202,7 @@ public class NoteService {
                     .type(FlavorType.TASTE)
                     .build());
         }
-        for (Long flavorId : aromaIds) {
+        for (Long flavorId : aromaIds.stream().distinct().toList()) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()

@@ -1,5 +1,6 @@
 앞으로 이 내용을 기반으로 작업해줘.
 반드시 COLLABORATION.md와 FEATURES.md, LEARNING.md도 함께 읽고 시작해줘.
+변경/개선 사항의 이유는 CHANGELOG.md에 기록되어 있어.
 
 ---
 
@@ -169,6 +170,7 @@ com.dongjin.tastingnote
 ├── note/dto/NoteResponse.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
+├── tag/repository/NoteTagRepository.java
 ├── flavor/entity/FlavorSuggestion.java
 ├── flavor/repository/FlavorSuggestionRepository.java
 ├── flavor/service/FlavorSuggestionService.java
@@ -216,9 +218,23 @@ com.dongjin.tastingnote
 
 ### 노트 삭제 시 연관 데이터 삭제 순서 (FK 제약 때문에 순서 중요)
 ```
-Report → NoteImage → NoteFlavor → Note
+Report → NoteImage → NoteFlavor → NoteTag → Note
 ```
 > NoteImage S3 업로드 구현 시 S3에서도 파일 삭제 로직 추가 필요.
+> **Like 기능 구현 시 반드시 추가**: Like(note_like)도 note_id FK 있음 → LikeService 구현 후 deleteNote()에 `likeRepository.deleteAllByNoteId(noteId)` 추가 필요. 순서: Report → NoteImage → NoteFlavor → NoteTag → Like → Note
+
+### 알려진 설계 주의사항
+
+| # | 항목 | 내용 |
+|---|------|------|
+| 1 | rating 0.5 단위 검증 | @Min(1)/@Max(5)만 있고 0.5 단위 검증 없음. 1.3점 같은 값 저장 가능 → 수정 완료 (2026-04-10) |
+| 2 | 빈 키워드 검색 | keyword="" 시 LIKE %% → 전체 반환. 최소 1자 검증 추가 필요 → 수정 완료 (2026-04-10) |
+| 3 | AlcoholCategory 한글명 | API 응답에 영문 enum만 반환. categoryKo 필드 추가로 해결 → 수정 완료 (2026-04-10) |
+| 4 | 탈퇴 유저 노트 피드 노출 | UserService 탈퇴 구현 시 반드시 모든 노트 isPublic=false 처리 필요 |
+| 5 | 탈퇴 후 Access Token 유효 | 탈퇴해도 기존 Access Token 만료(1시간)까지 API 호출 가능. 탈퇴 기능 구현 시 Access Token 만료 시간 단축(15~30분) 검토 필요 |
+| 8 | 탈퇴 시 닉네임 처리 필수 | nickname 컬럼에 DB UNIQUE 제약 있음. 탈퇴 유저 닉네임을 그대로 두면 다른 사람이 같은 닉네임 가입 시도 시 500 에러. 탈퇴 구현 시 반드시 nickname을 고유값으로 변경 필요 (예: "동진_deleted_42") |
+| 6 | 카테고리 단일 매칭 | AlcoholCategory.findByNameKo()가 첫 번째 매칭 카테고리만 반환. "주" 검색 시 SOJU만 매칭. 복수 카테고리 매칭은 추후 개선 |
+| 7 | 로그인 브루트포스 방어 없음 | Rate limiting 미구현. 서비스 오픈 전 Nginx 또는 AWS WAF 레벨에서 처리 예정 |
 
 ---
 
@@ -282,6 +298,39 @@ Report → NoteImage → NoteFlavor → Note
   - NoteResponse: alcoholName(자유입력) → alcoholName(공식 영문) + alcoholNameKo(공식 한글)
   - ReportRepository.deleteAllByNoteId() 추가
   - NoteService.deleteNote(): Report → NoteFlavor → Note 순서로 삭제 (FK 오류 수정)
+- feature/alcohol-category-search (2026-04-10)
+  - AlcoholCategory enum에 한글명 추가 (nameKo 필드, findByNameKo 메서드)
+  - AlcoholService.search(): 카테고리 한글명 매칭 추가 (예: "위스키" → WHISKEY 전체 반환)
+  - AlcoholResponse에 categoryKo 필드 추가 (프론트 한글 표시용)
+  - NoteTagRepository 생성 (deleteAllByNoteId)
+  - NoteService.deleteNote(): NoteTag 삭제 추가 (Report → NoteImage → NoteFlavor → NoteTag → Note)
+  - AlcoholController: 빈 키워드 검색 방지 (@Validated + @Size(min=1))
+  - NoteService: rating 0.5 단위 검증 추가 (1.3점 등 잘못된 값 방지)
+  - SecurityConfig: 비로그인 노트 상세 조회 허용 (RegexRequestMatcher로 /api/notes/{숫자} GET만 허용)
+  - NoteController.getNote(): userId 선택적 추출 (비로그인 시 null 처리)
+  - FlavorSuggestionResponse: id 포함 응답으로 변경 (노트 작성 시 flavorId 필요)
+  - 보안 취약점 수정 (2026-04-10)
+    - ReportService: 비공개/DRAFT 노트 신고 차단 (FORBIDDEN_ACCESS)
+    - ReportService: reason=OTHER 시 reasonDetail 필수 검증
+    - UserService.reissue(): 탈퇴 유저(deletedAt != null) 토큰 재발급 차단
+    - SignUpRequest: 닉네임 공백 불가 (@Pattern "^\S+$")
+    - SignUpRequest: 비밀번호 영문+숫자 필수 (@Pattern)
+    - NoteController: createNote Swagger 설명 수정 (status 필드 오해 제거)
+  - 데이터 일관성 수정 (2026-04-10)
+    - Note.saveDraft(): isPublic false로 초기화 (unpublish 시 공개 상태 유지 버그 수정)
+    - NoteService.createNote(): isPublic 항상 false 고정 (DRAFT+isPublic=true 불일치 방지)
+    - NoteService.saveFlavors(): distinct() 추가 (중복 flavorId 방어)
+    - NoteCreateRequest: isPublic 필드 제거 (생성 시 의미 없는 필드 혼란 방지)
+  - 입력 검증 추가 (2026-04-10)
+    - NoteCreateRequest/UpdateRequest: title, location @Size(max=100)
+    - AlcoholController: keyword @NotBlank 추가 (공백 키워드 전체 반환 방지)
+    - AlcoholService.search(): keyword.trim() 적용 (앞뒤 공백 처리)
+    - UserRepository: existsByNicknameAndDeletedAtIsNull 사용 (탈퇴 유저 닉네임 즉시 해제)
+    - UserService.signUp()/login(): email.toLowerCase() 정규화 (대소문자 이메일 통일)
+    - ReportRequest.reasonDetail: @Size(max=500) 추가
+  - 응답 구조 개선 (2026-04-10)
+    - NoteResponse tastes/aromas: List<String> → List<FlavorItem>(id+name) 변경 (수정 화면 복원 지원)
+    - Note.pairing: @Column(columnDefinition = "TEXT") 추가 (VARCHAR 255 제한 제거)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
