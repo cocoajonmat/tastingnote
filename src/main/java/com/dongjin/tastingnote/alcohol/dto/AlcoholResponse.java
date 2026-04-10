@@ -15,6 +15,7 @@ public class AlcoholResponse {
     private String name;
     private String nameKo;
     private AlcoholCategory category;
+    private String categoryKo;
     private String origin;
     private String region;
     private Integer vintage;
@@ -27,6 +28,7 @@ public class AlcoholResponse {
                 .name(alcohol.getName())
                 .nameKo(alcohol.getNameKo())
                 .category(alcohol.getCategory())
+                .categoryKo(alcohol.getCategory().getNameKo())
                 .origin(alcohol.getOrigin())
                 .region(alcohol.getRegion())
                 .vintage(alcohol.getVintage())

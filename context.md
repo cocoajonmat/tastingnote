@@ -169,6 +169,7 @@ com.dongjin.tastingnote
 ├── note/dto/NoteResponse.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
+├── tag/repository/NoteTagRepository.java
 ├── flavor/entity/FlavorSuggestion.java
 ├── flavor/repository/FlavorSuggestionRepository.java
 ├── flavor/service/FlavorSuggestionService.java
@@ -216,9 +217,18 @@ com.dongjin.tastingnote
 
 ### 노트 삭제 시 연관 데이터 삭제 순서 (FK 제약 때문에 순서 중요)
 ```
-Report → NoteImage → NoteFlavor → Note
+Report → NoteImage → NoteFlavor → NoteTag → Note
 ```
 > NoteImage S3 업로드 구현 시 S3에서도 파일 삭제 로직 추가 필요.
+
+### 알려진 설계 주의사항
+
+| # | 항목 | 내용 |
+|---|------|------|
+| 1 | rating 0.5 단위 검증 | @Min(1)/@Max(5)만 있고 0.5 단위 검증 없음. 1.3점 같은 값 저장 가능 → 수정 완료 (2026-04-10) |
+| 2 | 빈 키워드 검색 | keyword="" 시 LIKE %% → 전체 반환. 최소 1자 검증 추가 필요 → 수정 완료 (2026-04-10) |
+| 3 | AlcoholCategory 한글명 | API 응답에 영문 enum만 반환. categoryKo 필드 추가로 해결 → 수정 완료 (2026-04-10) |
+| 4 | 탈퇴 유저 노트 피드 노출 | UserService 탈퇴 구현 시 반드시 모든 노트 isPublic=false 처리 필요 |
 
 ---
 
@@ -282,6 +292,14 @@ Report → NoteImage → NoteFlavor → Note
   - NoteResponse: alcoholName(자유입력) → alcoholName(공식 영문) + alcoholNameKo(공식 한글)
   - ReportRepository.deleteAllByNoteId() 추가
   - NoteService.deleteNote(): Report → NoteFlavor → Note 순서로 삭제 (FK 오류 수정)
+- feature/alcohol-category-search (2026-04-10)
+  - AlcoholCategory enum에 한글명 추가 (nameKo 필드, findByNameKo 메서드)
+  - AlcoholService.search(): 카테고리 한글명 매칭 추가 (예: "위스키" → WHISKEY 전체 반환)
+  - AlcoholResponse에 categoryKo 필드 추가 (프론트 한글 표시용)
+  - NoteTagRepository 생성 (deleteAllByNoteId)
+  - NoteService.deleteNote(): NoteTag 삭제 추가 (Report → NoteImage → NoteFlavor → NoteTag → Note)
+  - AlcoholController: 빈 키워드 검색 방지 (@Validated + @Size(min=1))
+  - NoteService: rating 0.5 단위 검증 추가 (1.3점 등 잘못된 값 방지)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`

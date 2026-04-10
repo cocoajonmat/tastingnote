@@ -1189,3 +1189,99 @@ if (slackWebhookUrl == null || slackWebhookUrl.isBlank()) {
 
 IntelliJ Run Configuration → Environment variables에 등록해서 사용.
 서버(prod)에서는 GitHub Secrets → 환경변수로 주입.
+
+---
+
+## enum에 필드와 메서드 추가하기 (2026-04-10)
+
+### 왜?
+`AlcoholCategory`는 `WHISKEY`, `WINE` 같은 영문 값만 있어서 유저가 "위스키"로 검색하면 결과가 없었어요.
+enum에 한글명을 추가해서 해결했어요.
+
+### 구조
+
+```java
+@Getter
+@RequiredArgsConstructor
+public enum AlcoholCategory {
+    WHISKEY("위스키"),
+    WINE("와인");
+
+    private final String nameKo;  // 생성자로 주입
+
+    public static AlcoholCategory findByNameKo(String keyword) {
+        for (AlcoholCategory category : values()) {
+            if (category.nameKo.contains(keyword) || keyword.contains(category.nameKo)) {
+                return category;
+            }
+        }
+        return null;
+    }
+}
+```
+
+- `@RequiredArgsConstructor` — Lombok이 `final` 필드를 받는 생성자를 자동 생성
+- `values()` — enum의 모든 값을 배열로 반환하는 내장 메서드
+- `contains` 양방향 체크 — "위스키"가 "위스키 애호가"를 포함하거나, 반대도 매칭
+
+---
+
+## LinkedHashSet으로 중복 없이 순서 유지 (2026-04-10)
+
+### 왜?
+검색 결과 두 개(키워드 매칭 + 카테고리 매칭)를 합칠 때 중복이 생길 수 있어요.
+예: "조니워커"로 검색 시 nameKo 매칭 + WHISKEY 카테고리 결과 모두 조니워커 포함 가능.
+
+```java
+Set<AlcoholResponse> results = new LinkedHashSet<>(keywordResults);
+categoryResults.forEach(results::add);  // 중복이면 무시됨
+return new ArrayList<>(results);
+```
+
+- `HashSet` — 중복 제거되지만 순서 보장 없음
+- `LinkedHashSet` — 중복 제거 + 삽입 순서 유지
+- `equals/hashCode` 필요 — `@EqualsAndHashCode(of = "id")`로 id 기준 중복 판단
+
+---
+
+## @Validated + @Size로 컨트롤러 파라미터 검증 (2026-04-10)
+
+### 왜?
+`@RequestParam`으로 받는 값은 `@Valid`가 아닌 `@Validated`를 클래스에 붙여야 검증이 적용돼요.
+
+```java
+@RestController
+@Validated  // 클래스에 붙여야 @RequestParam 검증 활성화
+public class AlcoholController {
+
+    @GetMapping("/search")
+    public ResponseEntity<?> search(
+            @RequestParam @Size(min = 1, message = "검색어는 1자 이상 입력해주세요") String keyword) {
+        ...
+    }
+}
+```
+
+- `@Valid` — DTO(RequestBody) 검증에 사용
+- `@Validated` — 컨트롤러 클래스에 붙여서 `@RequestParam`, `@PathVariable` 검증 활성화
+
+---
+
+## rating 0.5 단위 검증 (2026-04-10)
+
+### 왜?
+`@Min(1)`, `@Max(5)`만으로는 1.3점, 2.7점 같은 잘못된 값을 막을 수 없어요.
+0.5 단위인지 검증하는 로직을 서비스에서 직접 처리했어요.
+
+```java
+private void validateRating(Double rating) {
+    if (Math.round(rating * 10) % 5 != 0) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT);
+    }
+}
+```
+
+**왜 `Math.round(rating * 10) % 5`인가?**
+- 0.5 단위 값들을 10배하면 모두 5의 배수: 1.0→10, 1.5→15, 2.0→20
+- `double` 타입은 부동소수점 오차가 있어서 `(int)(1.5 * 10)`이 14가 될 수 있음
+- `Math.round()`로 반올림 후 나머지 연산하면 오차 없이 정확하게 검증 가능
