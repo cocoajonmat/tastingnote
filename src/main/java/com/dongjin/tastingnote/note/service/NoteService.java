@@ -82,7 +82,7 @@ public class NoteService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
-        boolean isOwner = note.getUser().getId().equals(requesterId);
+        boolean isOwner = requesterId != null && note.getUser().getId().equals(requesterId);
 
         if (note.getStatus() == NoteStatus.DRAFT && !isOwner) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);

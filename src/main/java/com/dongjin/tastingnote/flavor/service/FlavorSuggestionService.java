@@ -1,5 +1,6 @@
 package com.dongjin.tastingnote.flavor.service;
 
+import com.dongjin.tastingnote.flavor.dto.FlavorSuggestionResponse;
 import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,9 +15,9 @@ public class FlavorSuggestionService {
 
     private final FlavorSuggestionRepository flavorSuggestionRepository;
 
-    public List<String> getAll() {
+    public List<FlavorSuggestionResponse> getAll() {
         return flavorSuggestionRepository.findAll().stream()
-                .map(f -> f.getName())
+                .map(FlavorSuggestionResponse::from)
                 .toList();
     }
 }
