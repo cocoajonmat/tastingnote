@@ -33,6 +33,10 @@ public class ReportService {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
+        if (note.getUser().getId().equals(reporterId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+
         reportRepository.save(Report.builder()
                 .reporter(reporter)
                 .note(note)

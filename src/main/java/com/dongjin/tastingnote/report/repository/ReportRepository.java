@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReportRepository extends JpaRepository<Report, Long> {
 
     boolean existsByReporterIdAndNoteId(Long reporterId, Long noteId);
+
+    void deleteAllByNoteId(Long noteId);
 }

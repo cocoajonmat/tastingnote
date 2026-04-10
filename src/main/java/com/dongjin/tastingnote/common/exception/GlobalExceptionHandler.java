@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 @RequiredArgsConstructor
@@ -28,6 +29,13 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
                 .orElse("입력값이 올바르지 않습니다");
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(message));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        String message = e.getName() + "의 값이 올바르지 않습니다: " + e.getValue();
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(message));
     }

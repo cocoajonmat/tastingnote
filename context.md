@@ -13,16 +13,19 @@
 ## 엔티티 설계 확정
 
 ### User
-- Soft Delete 방식 (deleted_at 컬럼) ✅ 구현 완료
-- 회원탈퇴:
+- Soft Delete 방식 (deleted_at 컬럼) 
+- 회원탈퇴: ❌ 미구현
     - 탈퇴 시 deleted_at 기록 + 모든 노트 isPublic = false
     - 30일 유예 기간 후 Hard Delete 스케줄러로 완전 삭제
     - 유예 기간 중 계정 복구 가능
     - 탈퇴 시 연관 데이터(좋아요, 태그 등) 유지 → Hard Delete 시 함께 삭제
+- 탈퇴 후 30일 유예 기간 중 동일 이메일 재가입 불가 (Hard Delete 후에만 허용)
+  - 이유: 신고 누적으로 탈퇴한 유저가 즉시 재가입하면 신고 기록이 무의미해짐. 30일 유예는 실수로 탈퇴한 유저의 복구 기간이지 우회 경로가 되면 안 됨
+  - 코드: existsByEmail이 deletedAt 여부 상관없이 이메일 중복 체크 → 의도된 동작
 - 소셜 로그인 유저는 password null 허용
 - 소셜 로그인 첫 가입 시 닉네임 설정 페이지로 이동 + 실시간 중복 체크
 - 로그인 식별자: 이메일 (username 필드 제거됨)
-- 닉네임 변경: 허용, 30일 1회 제한 / 프로필 URL은 내부 ID 기반 (nicknameChangedAt 컬럼 추가 필요)
+- 닉네임 변경: 허용, 30일 1회 제한 / 프로필 URL은 내부 ID 기반 (nicknameChangedAt 컬럼 추가 필요 — 미구현)
 - 프로필 페이지: 미니 포트폴리오 방식
     - 공개 노트 목록
     - 많이 마신 술 카테고리 (예: "위스키 애호가")
@@ -34,22 +37,29 @@
 - AlcoholAlias 테이블 별도 (별칭 검색용)
     - 예: "블랙라벨", "JW Black" → "조니워커 블랙라벨"로 매칭
 - 술 검색 시 name + nameKo + AlcoholAlias 통합 검색
-- DB에 없는 술 → Note의 alcoholName 필드에 자유 텍스트 저장 (alcohol 필드 null)
+- DB에 없는 술 → AlcoholRequest 등록 요청 → 관리자 승인 후 노트 작성 가능 (엄격한 방식 확정)
 - 데이터 전략:
     - 1단계: SQL로 초기 데이터 미리 삽입 (자주 마시는 술 위주)
     - 2단계(추후): 유저 등록 요청 → 관리자 승인 방식 추가
     - 어드민 페이지는 지금 만들지 않음
+- 크라우드소싱 방식 확정 (추후 구현 시):
+    - 유저가 공식 명칭 + 별칭을 함께 제안, 관리자가 검토 후 승인
+    - 별칭도 유저가 직접 제안 (관리자가 직접 입력하는 방식은 작업량 과다)
+    - 이유: 유저가 실제로 쓰는 별칭을 관리자보다 더 잘 알고 있음. 별칭이 많을수록 검색 품질 향상
+    - 구현 시 AlcoholRequest 테이블 추가 필요 (name, nameKo, aliases, status: PENDING/APPROVED/REJECTED)
 - 술 상세 페이지 도입 검토 중 (친구와 상의 필요)
     - 해당 술의 평균 별점, 다른 유저 노트 목록 등 집약
     - Vivino 방식 참고 — 술 페이지가 핵심 콘텐츠가 됨
     - Discovery 기능(Q3)과도 연결됨
 
 ### Note
-- alcohol 필드 (@ManyToOne, nullable) → DB에 있는 술
-- alcoholName 필드 (String, nullable) → DB에 없는 술 직접 입력
+- alcohol 필드 (@ManyToOne, nullable = false) → DB에 있는 술 필수 선택
+- alcoholName 자유입력 제거 — 엄격한 방식으로 변경 확정 (2026-04-09)
+  - 이유: 자유입력 허용 시 같은 술이 "조니워커", "JW Black" 등으로 제각각 저장돼 Discovery/통계/술 상세 페이지 기능 불가
+  - DB에 없는 술은 AlcoholRequest로 등록 요청 → 승인 후 노트 작성
 - title → 필수
 - rating → 필수, 5점 만점 (1.0~5.0, 0.5단위) — DECIMAL(2,1) 타입
-- taste, aroma → 하이브리드 방식 (제안 목록 + 자유 입력 둘 다 허용)
+- taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
 - drankAt → 선택
@@ -58,19 +68,26 @@
     - DRAFT: 임시저장 상태, isPublic 토글 불가
     - PUBLISHED: 발행 상태, isPublic 토글 가능
 
+### NoteFlavor (새 테이블 추가) ✅ 구현 완료
+- Note ↔ FlavorSuggestion 다대다 중간 테이블
+- FlavorType: TASTE / AROMA 구분
+- uniqueConstraint(note_id, flavor_id, type) — 같은 노트에 같은 맛/향 중복 불가
+- 이유: Vivino처럼 선택 목록에서만 입력 → 데이터 일관성 확보, 술 상세 페이지/Discovery 통계 가능
+
 ### NoteImage
 - 저장 위치: AWS S3
 - 업로드 시점: 노트 저장 요청 시 이미지도 같이 서버로 보내서 S3에 업로드 후 저장
 - 이미지 장수: 우선 1장으로 운영 (추후 변경 가능, 미확정)
 
 ### Like (반응)
-- LikeType: LIKE, LOVE, WANT, IMPRESSED, HELPFUL
+- LikeType: CHEERS 단일 타입으로 확정 (Untappd의 Toast와 동일 방식, 술 앱 정체성 반영)
 - 노트당 하나만 선택 가능
+- WANT("마셔보고 싶다")는 나중에 Alcohol 상세 페이지의 위시리스트 기능으로 분리 예정
 
-### FlavorSuggestion (새 테이블 추가)
-- taste/aroma 입력 시 제안 목록용
+### FlavorSuggestion ✅ 구현 완료
+- taste/aroma 선택 목록 데이터 (관리자가 등록)
 - 공통 목록 하나 (술 카테고리별 분리 안 함)
-- Note 엔티티 변경 없이 별도 테이블로 관리
+- NoteFlavor 중간 테이블을 통해 Note와 연결
 
 ### Report (신고) ✅ 구현 완료
 - 신고 사유: Enum (SPAM, INAPPROPRIATE, FALSE_INFO, OTHER)
@@ -120,6 +137,7 @@
 com.dongjin.tastingnote
 ├── user/entity/User.java
 ├── user/entity/RefreshToken.java
+├── user/entity/Provider.java
 ├── user/repository/UserRepository.java
 ├── user/repository/RefreshTokenRepository.java
 ├── user/service/UserService.java
@@ -129,12 +147,32 @@ com.dongjin.tastingnote
 ├── user/dto/TokenResponse.java
 ├── alcohol/entity/Alcohol.java
 ├── alcohol/entity/AlcoholAlias.java
+├── alcohol/entity/AlcoholCategory.java
+├── alcohol/repository/AlcoholRepository.java
+├── alcohol/dto/AlcoholResponse.java
+├── alcohol/service/AlcoholService.java
+├── alcohol/controller/AlcoholController.java
 ├── note/entity/Note.java
 ├── note/entity/NoteImage.java
 ├── note/entity/Like.java
+├── note/entity/LikeType.java
+├── note/entity/NoteStatus.java
+├── note/entity/NoteFlavor.java
+├── note/entity/FlavorType.java
+├── note/repository/NoteRepository.java
+├── note/repository/NoteFlavorRepository.java
+├── note/repository/NoteImageRepository.java
+├── note/service/NoteService.java
+├── note/controller/NoteController.java
+├── note/dto/NoteCreateRequest.java
+├── note/dto/NoteUpdateRequest.java
+├── note/dto/NoteResponse.java
 ├── tag/entity/Tag.java
 ├── tag/entity/NoteTag.java
-├── flavor/entity/FlavorSuggestion.java (미구현)
+├── flavor/entity/FlavorSuggestion.java
+├── flavor/repository/FlavorSuggestionRepository.java
+├── flavor/service/FlavorSuggestionService.java
+├── flavor/controller/FlavorSuggestionController.java
 ├── report/entity/Report.java
 ├── report/entity/ReportReason.java
 ├── report/entity/ReportStatus.java
@@ -142,15 +180,45 @@ com.dongjin.tastingnote
 ├── report/service/ReportService.java
 ├── report/controller/ReportController.java
 ├── report/dto/ReportRequest.java
+├── common/BaseEntity.java
 ├── common/response/ApiResponse.java
+├── common/exception/GlobalExceptionHandler.java
 ├── common/jwt/JwtTokenProvider.java
-└── common/jwt/JwtAuthenticationFilter.java
+├── common/jwt/JwtAuthenticationFilter.java
+├── common/config/SecurityConfig.java
+└── common/config/SwaggerConfig.java
 
 ## 공통
 - 모든 엔티티는 BaseEntity 상속 (createdAt, updatedAt)
 - @ManyToOne은 fetch = FetchType.LAZY
 - Lombok 사용
 - @NoArgsConstructor(access = AccessLevel.PROTECTED)
+
+## 개발 규칙 — 새 기능 구현 시 체크리스트
+
+### 프론트엔드 개발 시작 전 반드시 추가할 것
+- **CORS 설정** — SecurityConfig에 추가 필요
+  - 이유: 브라우저는 프론트(예: localhost:3000)와 백엔드(예: localhost:8080) 주소가 다르면 API 호출을 막음
+  - 추가 위치: `SecurityConfig.filterChain()` 내부에 `.cors(...)` 설정
+
+
+
+### ErrorCode 추가 규칙
+새 기능을 구현할 때 필요한 ErrorCode를 함께 추가한다. 아래 목록을 보고 해당 기능 구현 시점에 반영할 것:
+
+| 기능 | 추가할 ErrorCode | HTTP |
+|------|----------------|------|
+| AlcoholRequest | `ALCOHOL_REQUEST_NOT_FOUND` | 404 |
+| Like | `ALREADY_LIKED` | 409 |
+| NoteImage (S3) | `IMAGE_UPLOAD_FAILED` | 500 |
+
+> ErrorCode는 비즈니스 로직 오류만 관리. 프레임워크 예외(타입 불일치 등)는 GlobalExceptionHandler에서 직접 처리.
+
+### 노트 삭제 시 연관 데이터 삭제 순서 (FK 제약 때문에 순서 중요)
+```
+Report → NoteImage → NoteFlavor → Note
+```
+> NoteImage S3 업로드 구현 시 S3에서도 파일 삭제 로직 추가 필요.
 
 ---
 
@@ -167,41 +235,103 @@ com.dongjin.tastingnote
 - 공통 ApiResponse<T> 적용 (모든 컨트롤러)
 - NoteController userId → JWT에서 추출 완료
 - 신고(Report) 기능 (ReportEntity, ReportService, ReportController)
-- Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 3개)
+- Swagger @Tag, @Operation, @SecurityRequirement 추가 (컨트롤러 5개: UserController, NoteController, ReportController, AlcoholController, FlavorSuggestionController)
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
+- feature/jwt-auth → main 머지 완료 (2026-04-02)
 - GitHub Actions CI/CD 배포 성공 확인
-- 개발 환경: 노트북 → 데스크탑 전환 완료
-- feature/flavor-suggestion → main PR 머지 완료 (PR #1, 2026-04-05)
-- FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료
-- AlcoholRepository/Service/Controller 구현 완료
-- GlobalExceptionHandler 구현 완료
-- 보안 이슈 수정 완료 (노트 본인 확인, 비공개 노트 조회 차단, 자기 노트 신고 방지)
+- 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
+- feature/flavor-suggestion → main PR 머지 완료 (PR #1, 2026-04-05, GitHub 웹에서 첫 PR)
+- FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
+- feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
+- AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
+- GlobalExceptionHandler 구현 완료 (feature/alcohol-api, 2026-04-03)
+- 보안 이슈 수정 완료 (feature/alcohol-api, 2026-04-03)
+  - 노트 수정/삭제/발행/되돌리기에 본인 확인 추가
+  - 비공개/DRAFT 노트 타인 조회 차단
+  - 자기 노트 신고 방지
+  - SecurityConfig 공개 피드(/api/notes/public) 비로그인 허용 추가
+  - DRAFT 상태 노트 isPublic=true 설정 차단 (NoteService updateNote)
+- NoteCreateRequest rating @NotNull 필수 검증 추가 (feature/alcohol-api, 2026-04-03)
 - feature/error-handling → main PR 머지 완료 (PR #2, 2026-04-07)
-  - ErrorCode enum (상태코드 + 에러코드 + 메시지 한 곳에서 관리)
+  - ErrorCode enum (HTTP 상태코드 + 에러코드 + 메시지 한 곳에서 관리)
   - BusinessException 커스텀 예외 클래스
-  - ErrorResponse record DTO
-  - GlobalExceptionHandler 업데이트
-  - UserService, NoteService, ReportService → BusinessException으로 교체
+  - ErrorResponse record DTO (success, errorCode, message)
+  - GlobalExceptionHandler 업데이트 (BusinessException 처리 추가)
+  - UserService, NoteService, ReportService: IllegalArgumentException → BusinessException 교체
 - feature/error-notification → main PR 머지 완료 (PR #3, 2026-04-07)
   - NotificationService — 500 에러 발생 시 Slack Webhook 알림 전송
   - AppConfig — RestTemplate Bean 등록
   - SLACK_WEBHOOK_URL 환경변수로 관리
-- Note taste/aroma Vivino 방식으로 재설계 (feature/note-flavor-redesign, 미머지)
+- Note taste/aroma Vivino 방식으로 재설계 (feature/note-flavor-redesign, 2026-04-05)
   - Note 엔티티 taste/aroma String 필드 제거
   - NoteFlavor 중간 테이블 추가 (FlavorType: TASTE/AROMA)
   - NoteCreateRequest/UpdateRequest: tasteIds, aromaIds(List<Long>)로 변경
   - NoteResponse: tastes, aromas(List<String>)로 변경
+  - NoteService: saveFlavors(), 수정 시 기존 삭제 후 재저장
+- feature/note-flavor-redesign, 2026-04-09
+  - AlcoholService.getById() IllegalArgumentException → BusinessException 수정
+  - NoteCreateRequest/UpdateRequest @NotNull 추가 (tasteIds, aromaIds, isPublic, rating)
+    - tasteIds/aromaIds: null 명시 입력 시 NPE 방지 (빈 배열은 허용)
+    - isPublic: nullable=false 컬럼이므로 null 저장 방지
+    - rating: 설계상 필수 항목인데 UpdateRequest에만 누락됐던 것 수정
+  - Note 엔티티 alcoholName 자유입력 필드 제거, alcohol nullable=false로 변경 (엄격한 방식 확정)
+  - NoteCreateRequest alcoholName 제거, alcoholId @NotNull 필수화
+  - NoteUpdateRequest alcoholId @NotNull 추가 (수정 시 술 변경도 가능)
+  - Note.update()에 Alcohol 파라미터 추가
+  - NoteResponse: alcoholName(자유입력) → alcoholName(공식 영문) + alcoholNameKo(공식 한글)
+  - ReportRepository.deleteAllByNoteId() 추가
+  - NoteService.deleteNote(): Report → NoteFlavor → Note 순서로 삭제 (FK 오류 수정)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
 
-1. **feature/note-flavor-redesign → main PR 머지** ← 바로 다음
-2. AlcoholRequest (크라우드소싱) — 유저 술 등록 요청 → 관리자 승인/병합/거절
-3. TagService / TagController
-4. LikeService / LikeController
-5. NoteImage S3 업로드
-6. 소셜 로그인 (OAuth2)
+1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
+2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
+   - GET /api/alcohols/search?keyword= (name + nameKo + alias 통합 검색)
+   - GET /api/alcohols?category= (카테고리별 목록)
+   - GET /api/alcohols/{id} (단건 조회)
+   - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
+3. **AlcoholRequest (크라우드소싱)** ← 다음 작업
+   - 술 데이터 품질이 서비스의 기반이므로 Tag/Like보다 우선
+   - alcoholName 자유입력 제거로 DB에 없는 술은 반드시 AlcoholRequest를 거쳐야 함 (엄격한 방식 확정)
+   - 초기 술 DB SQL 삽입(A안) + 크라우드소싱(B안) 조합으로 진행
+   - AlcoholRequest 엔티티 설계:
+     - name, nameKo, aliases, status, requestedBy(User), mergedToAlcoholId
+     - status: PENDING / APPROVED / MERGED / REJECTED
+   - 관리자 처리 액션 3가지:
+     - **승인 (신규 등록)**: 새로운 술 → Alcohol + Alias 생성
+     - **별칭으로 병합**: 이미 있는 술 → 기존 Alcohol에 alias만 추가 (mergedToAlcoholId 기록)
+     - **거절**: 장난/중복 등
+   - API 5개:
+     - POST /api/alcohol-requests — 유저: 술 등록 요청
+     - POST /api/admin/alcohol-requests/{id}/approve — 관리자: 승인
+     - POST /api/admin/alcohol-requests/{id}/merge?alcoholId= — 관리자: 별칭 병합
+     - POST /api/admin/alcohol-requests/{id}/reject — 관리자: 거절
+     - GET /api/admin/alcohol-requests?status=PENDING — 관리자: 대기 목록 조회
+   - 초반 운영: 어드민 페이지 없이 Swagger에서 관리자 API 호출
+   - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
+   - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
+4. **술 상세 페이지 API** (AlcoholRequest 직후 확정, 2026-04-10)
+   - AlcoholRequest 완료 후 술 DB가 채워지기 시작해야 의미 있음
+   - AlcoholController에 메서드 3개 추가:
+     - `GET /api/alcohols/{id}/notes` — 해당 술의 공개 노트 목록
+     - `GET /api/alcohols/{id}/stats` — 평균 별점 (노트 5개 이상 시 표시)
+     - `GET /api/alcohols/{id}/flavors` — 맛/향 분포 (NoteFlavor GROUP BY)
+   - 친구와 최종 확인 후 진행
+5. TagService / TagController
+   - **결정 필요**: Tag 엔티티에 `count` 필드가 있으나, context.md 확정 내용은 "NoteTag 개수 실시간 카운팅 방식 (Tag 테이블 컬럼 추가 없음)"
+     - A안: count 컬럼 유지 — 추가/삭제 시 +1/-1, 조회 빠르지만 동기화 안 맞을 수 있음
+     - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
+     - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
+6. LikeService / LikeController
+   - **나중에 할 것**: Tag, Like, 피드 API 완성 후 N+1 문제 해결
+     - 로컬에서 노트 100개 테스트 데이터 삽입
+     - Spring Boot 로그에서 쿼리 수 직접 확인
+     - NoteRepository 목록 조회 메서드에 @EntityGraph 적용
+     - 101번 → 1번으로 줄어드는 것 로그로 확인
+7. NoteImage S3 업로드
+8. 소셜 로그인 (OAuth2)
 
 ---
 

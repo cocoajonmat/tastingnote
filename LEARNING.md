@@ -167,9 +167,144 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 ## 앞으로 추가 예정
 
-- `AlcoholService/Controller` — 술 검색 (name + nameKo + alias 통합)
+- ~~`AlcoholService/Controller`~~ ✅ 완료
+- ~~`GlobalExceptionHandler`~~ ✅ 완료
 - `TagService/Controller` — 태그 자동완성, NoteTag 연결
 - `LikeService/Controller` — 반응 기능
+
+---
+
+## 백엔드 권한 검증이 항상 필요한 이유
+
+### "Never trust the client"
+프론트에서 버튼을 안 보여줘도, 누구든 Postman이나 curl로 API를 직접 호출할 수 있음.
+```
+PATCH /api/notes/42   ← 다른 사람 노트 ID
+Authorization: Bearer {내 토큰}
+```
+프론트 UI는 "보여주기"일 뿐이고, 진짜 보안은 항상 백엔드에서 해야 함.
+
+### TastingNote에 적용한 것
+- 노트 수정/삭제/발행/되돌리기: `note.getUser().getId().equals(userId)` 체크
+- 비공개(isPublic=false) 또는 DRAFT 노트: 본인 외 조회 차단
+- 신고: 자기 노트는 신고 불가
+
+### 패턴
+```java
+Note note = noteRepository.findById(noteId)
+        .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 노트입니다"));
+if (!note.getUser().getId().equals(userId)) {
+    throw new IllegalArgumentException("본인의 노트만 수정할 수 있습니다");
+}
+```
+리소스 조회 → 소유자 확인 → 비즈니스 로직 순서로 항상 처리.
+
+---
+
+## DB 인덱스와 LIKE 검색 성능
+
+### 인덱스란?
+DB가 데이터를 빠르게 찾기 위해 만들어두는 정렬된 목록. 책의 목차와 같음.
+목차가 있으면 원하는 페이지를 바로 찾을 수 있지만, 목차가 없으면 처음부터 끝까지 다 읽어야 함.
+
+### LIKE 검색과 인덱스
+```sql
+-- 인덱스 사용 가능 (앞부분이 고정)
+WHERE name LIKE 'John%'    -- "John으로 시작하는 것" → 목차에서 John 찾아서 거기서부터 읽으면 됨
+
+-- 인덱스 사용 불가 (앞이 불명확)
+WHERE name LIKE '%John%'   -- "어딘가에 John이 포함된 것" → 전체를 처음부터 끝까지 다 읽어야 함 (풀 테이블 스캔)
+```
+
+현재 `searchByKeyword`는 `%:keyword%` 방식이라 데이터가 많아지면 느려짐.
+술 DB는 수천 개 수준이라 지금은 체감 없음. 수십만 개가 되면 전환 필요.
+
+### 나중에 전환할 MySQL Full-Text Search
+DB가 단어 단위로 별도 인덱스를 만들어두는 방식. LIKE보다 훨씬 빠름.
+```sql
+-- LIKE 방식 (지금)
+WHERE name LIKE '%블랙%'              -- 전체 스캔
+
+-- Full-Text Search 방식 (나중에)
+WHERE MATCH(name) AGAINST('블랙')    -- 단어 인덱스 조회
+```
+전환 시점: 데이터가 많아져서 검색 속도가 느려진다고 느껴질 때.
+
+---
+
+## @RequestParam 필수/선택 옵션
+
+```java
+// 필수 (기본값) — 파라미터 없으면 400 에러
+@RequestParam AlcoholCategory category
+
+// 선택 — 파라미터 없으면 null
+@RequestParam(required = false) AlcoholCategory category
+```
+
+현재 `GET /api/alcohols`는 category가 필수라서 카테고리 없이 전체 조회 불가.
+나중에 "전체 술 목록" 기능이 필요하면 `required = false`로 바꾸고,
+category가 null이면 전체 반환, 있으면 필터링하는 방식으로 확장하면 됨.
+
+---
+
+## GlobalExceptionHandler (common/exception/GlobalExceptionHandler.java)
+
+### 왜 만들었나?
+예외 처리 없이는 에러 발생 시 500 + HTML 에러 페이지가 내려가서 프론트가 파싱을 못 함.
+모든 API에 공통 에러 응답 형식(`ApiResponse.fail(message)`)을 적용하기 위해 만듦.
+
+### 핵심 어노테이션
+**`@RestControllerAdvice`** — 애플리케이션 전체에서 발생하는 예외를 한 곳에서 처리하는 클래스임을 선언.
+**`@ExceptionHandler`** — 특정 예외 타입이 발생했을 때 실행할 메서드를 지정.
+
+### 우선순위 규칙
+Spring은 **가장 구체적인 타입부터** 매칭시킴.
+```
+IllegalArgumentException 발생 → IllegalArgumentException 핸들러
+MethodArgumentNotValidException 발생 → MethodArgumentNotValidException 핸들러
+그 외 모든 예외 → Exception 핸들러 (가장 넓은 범위, 마지막에 처리)
+```
+
+### 현재 처리 목록
+| 예외 | 원인 | HTTP 상태 |
+|------|------|-----------|
+| `IllegalArgumentException` | 비즈니스 로직 에러 (존재하지 않는 리소스, 중복 등) | 400 |
+| `MethodArgumentNotValidException` | `@Valid` 검증 실패 (필수값 누락, 형식 오류 등) | 400 |
+| `Exception` | 예상 못한 서버 에러 | 500 |
+
+### 나중에 추가하는 방법
+커스텀 예외 클래스(`NotFoundException` 등)를 만들고 핸들러 하나만 추가하면 바로 적용됨.
+
+---
+
+## Git 브랜치 머지 방향
+
+머지는 **덮어쓰기가 아니라 합치기**다. 방향이 두 가지로 나뉜다.
+
+### feature → main (내 작업을 main에 올리기)
+기능 개발 완료 후 PR을 열어 main에 머지.
+
+### main → feature (main 변경사항을 내 브랜치로 가져오기)
+```bash
+git merge main
+```
+예: flavor 버그 수정이 main에 머지된 후, alcohol-api 브랜치에서 위 명령 실행.
+→ main의 변경사항만 추가로 들어오고, 내가 만든 파일(AlcoholController 등)은 그대로 유지됨.
+
+**Git이 하는 일**: "main에는 있는데 내 브랜치에 없는 변경사항"만 가져와서 추가. 내 파일을 덮어쓰지 않는다.
+
+### 실무 흐름 예시
+```
+1. flavor 버그 수정 → main 머지
+2. alcohol-api에서 git merge main 실행 (flavor 수정사항 반영)
+3. 로컬에서 테스트 확인
+4. alcohol-api → main 머지
+```
+
+### 충돌(Conflict)이 나는 경우
+같은 파일을 양쪽(main과 내 브랜치)에서 동시에 수정했을 때만 발생.
+flavor와 alcohol은 건드리는 파일이 다르므로 충돌 가능성 거의 없음.
 
 ---
 
@@ -187,12 +322,18 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 **TastingNote에 적용한다면**
 ```
-유저: "발베니 12년" 등록 요청
+유저: "발베니 12년 더블우드" 등록 요청 + 별칭: ["발베니 12", "Balvenie 12"]
     → DB에 PENDING 상태로 저장
     → 관리자 검토 (DBeaver 등 DB 툴로 직접 승인 가능 — 초반엔 어드민 페이지 불필요)
-        → 승인 → Alcohol 테이블에 정식 등록
+        → 승인 → Alcohol 테이블에 정식 등록 + AlcoholAlias 테이블에 별칭 등록
         → 거절 → 요청 REJECTED 처리
 ```
+
+**별칭도 유저가 제안하는 이유**
+관리자가 별칭을 직접 입력하는 방식은 작업량이 너무 많음.
+유저가 실제로 검색할 때 쓰는 별칭을 관리자보다 유저가 더 잘 알고 있음.
+예: "블랙라벨", "JW Black" 같은 별칭은 술을 마시는 사람들 사이에서 자연스럽게 쓰이는 표현.
+별칭이 많을수록 검색 품질이 올라가고 유저가 원하는 술을 더 쉽게 찾을 수 있음.
 
 **크라우드소싱 없을 때의 문제**
 같은 술이 여러 이름으로 저장될 수 있음:
@@ -202,8 +343,9 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 → 나중에 "이 술을 마신 사람들" 기능을 만들 수 없게 됨
 
-**구현 난이도**
-- 어렵지 않음. `AlcoholRequest` 테이블 추가 + 요청/승인 API 2개가 전부
+**구현 시 필요한 것**
+- `AlcoholRequest` 테이블: name, nameKo, aliases(별칭 목록), status(PENDING/APPROVED/REJECTED), requesterId
+- 요청 API + 승인 API 2개
 - 어드민 페이지 없이 초반엔 DB 툴로 직접 관리 가능
 - 요청이 많아지면 그때 어드민 페이지 추가
 
@@ -365,6 +507,597 @@ private Double rating;
 
 **`DECIMAL(2,1)`** — 전체 자릿수 2자리, 소수점 1자리. 즉 1.0 ~ 9.9 범위 저장 가능.
 H2, MySQL 둘 다 `DECIMAL` 타입을 지원하기 때문에 환경에 따라 코드 변경 불필요.
+
+---
+
+## N+1 쿼리 문제와 해결
+
+### N+1이란?
+목록을 조회할 때 연관 데이터를 가져오기 위해 쿼리가 N+1번 실행되는 현상.
+"1"은 목록 조회 쿼리, "N"은 각 항목마다 연관 데이터를 가져오는 쿼리.
+
+```
+노트 50개 목록 조회
+    → SELECT * FROM note (1번)
+    → SELECT * FROM users WHERE id = 1 (note[0]의 user)
+    → SELECT * FROM users WHERE id = 2 (note[1]의 user)
+    → ... (50번)
+    → SELECT * FROM alcohol WHERE id = 5 (note[0]의 alcohol)
+    → ... (50번)
+총 101번 쿼리
+```
+
+### 왜 LAZY 로딩을 쓰는데 이런 문제가?
+LAZY 로딩은 연관 데이터를 "실제로 접근할 때만" DB에서 가져옴.
+단건 조회처럼 연관 데이터가 필요 없는 경우엔 쿼리를 아예 안 보냄 → 효율적.
+
+문제는 목록 조회에서 루프를 돌 때:
+```java
+// 이 코드가 내부에서 실행되면
+notes.stream().map(NoteResponse::from)  // from() 안에서 note.getUser() 호출
+// → 각 note마다 SELECT * FROM users WHERE id = ? 실행
+```
+LAZY의 장점이 오히려 목록에서는 독이 됨.
+
+### 왜 EAGER로 바꾸면 안 되나?
+EAGER는 항상 JOIN을 강제함.
+```java
+// note 하나를 조회해도 항상 user와 alcohol을 JOIN해서 가져옴
+noteRepository.findById(noteId)
+// → SELECT * FROM note LEFT JOIN users LEFT JOIN alcohol ...
+```
+"note가 몇 개 있는지만 확인"하거나 "noteId만 필요한" 경우에도 불필요한 JOIN 발생.
+특히 연관 관계가 많은 엔티티에서 EAGER를 쓰면 쿼리가 거대해짐.
+
+### 해결: @EntityGraph
+LAZY는 유지하되, 목록 조회 메서드에만 "이 쿼리에서는 JOIN으로 한 번에 가져와"라고 지정.
+
+```java
+@EntityGraph(attributePaths = {"user", "alcohol"})
+List<Note> findAllByIsPublicTrueAndStatus(NoteStatus status);
+```
+
+결과:
+```sql
+-- @EntityGraph 적용 후
+SELECT n.*, u.*, a.*
+FROM note n
+LEFT JOIN users u ON n.user_id = u.id
+LEFT JOIN alcohol a ON n.alcohol_id = a.id
+WHERE n.is_public = true AND n.status = 'PUBLISHED'
+-- 101번 → 1번
+```
+
+### @EntityGraph vs JOIN FETCH 비교
+| | @EntityGraph | JOIN FETCH |
+|---|---|---|
+| 작성 방식 | 어노테이션 | JPQL 직접 작성 |
+| 코드 가독성 | 높음 | 낮음 (쿼리 직접 씀) |
+| 유연성 | 낮음 | 높음 (복잡한 조건 가능) |
+| 언제 쓰나 | Spring Data JPA 메서드와 함께 | 복잡한 조인 조건이 있을 때 |
+
+이 프로젝트처럼 메서드 이름 쿼리를 쓰는 경우엔 @EntityGraph가 더 깔끔함.
+
+---
+
+## FetchType.LAZY vs EAGER 정리
+
+| | LAZY | EAGER |
+|---|---|---|
+| 연관 데이터 로딩 시점 | 실제 접근할 때 | 항상 (조회 즉시) |
+| 단건 조회 | 효율적 | 불필요한 JOIN 발생 가능 |
+| 목록 조회 | N+1 주의 | JOIN 1번으로 해결되지만 항상 비용 발생 |
+| JPA 권장 | @ManyToOne 기본값 EAGER → 명시적으로 LAZY 설정 권장 | |
+
+**결론**: @ManyToOne은 항상 LAZY로 설정하고, 목록 조회가 필요한 곳에서만 @EntityGraph로 해결하는 게 가장 정교한 방식.
+
+---
+
+## 낙관적 락(Optimistic Lock) vs 비관적 락(Pessimistic Lock)
+
+### 왜 필요한가?
+같은 데이터를 여러 곳에서 동시에 수정하려 할 때 충돌이 발생함.
+예: 노트를 폰과 노트북에서 동시에 열고 둘 다 수정 후 저장 → 먼저 저장한 내용이 사라짐.
+
+### 비관적 락(Pessimistic Lock)
+"충돌이 자주 일어날 것"이라고 비관적으로 가정하고, 처음부터 잠금.
+```
+A가 note 42를 읽음 → DB에서 해당 레코드에 잠금(SELECT FOR UPDATE)
+B가 note 42를 읽으려 함 → A가 저장할 때까지 대기
+A 저장 완료 → 잠금 해제 → B가 읽을 수 있음
+```
+- 장점: 충돌이 절대 발생하지 않음
+- 단점: 대기 시간 발생, 잠금이 겹치면 데드락 위험, 트래픽 많을수록 병목
+
+### 낙관적 락(Optimistic Lock)
+"충돌이 드물 것"이라고 낙관적으로 가정하고, 잠금 없이 진행 후 저장 시 확인.
+```
+A가 note 42를 읽음 (version = 3)
+B가 note 42를 읽음 (version = 3)
+A가 먼저 저장 → version이 3인지 확인 → 맞음 → 저장 성공 → version = 4
+B가 나중에 저장 → version이 3인지 확인 → 실제는 4 → 불일치 → OptimisticLockException 발생
+→ 클라이언트에 "다른 곳에서 이미 수정됨, 새로고침 필요" 안내
+```
+- 장점: 평상시엔 잠금 없이 작동, 성능 부하 없음
+- 단점: 충돌 발생 시 재시도 로직이 클라이언트에 필요
+
+### 왜 TastingNote에서는 낙관적 락?
+노트 편집은 같은 노트를 두 곳에서 동시에 수정하는 경우가 드묾.
+충돌이 드문 상황에서 비관적 락으로 항상 DB 잠금을 거는 건 오버헤드.
+낙관적 락은 평상시 성능을 희생하지 않으면서 실제 충돌만 처리.
+
+### Spring JPA 구현
+```java
+// Note 엔티티에 추가
+@Version
+private Long version;
+// Hibernate가 자동으로 UPDATE 시 WHERE version = ? 조건 추가
+// 버전이 달라졌으면 OptimisticLockException 발생
+```
+
+---
+
+## 캐싱(Caching) 개념
+
+### 캐싱이란?
+자주 요청되는 데이터를 메모리(RAM)에 저장해두고, 같은 요청 시 DB까지 가지 않고 메모리에서 바로 응답하는 방식.
+
+```
+[캐싱 없을 때]
+유저 요청 → 서버 → DB 조회(수십 ms) → 응답
+
+[캐싱 있을 때 - 첫 번째 요청]
+유저 요청 → 서버 → DB 조회(수십 ms) → 메모리에 저장 → 응답
+
+[캐싱 있을 때 - 이후 같은 요청]
+유저 요청 → 서버 → 메모리에서 즉시 응답(수 μs)
+```
+
+DB: 수십 ms / 메모리: 수 μs → 수천 배 차이.
+
+### 어떤 데이터에 적합한가?
+캐싱은 **읽기가 많고 변경이 적은 데이터**에 효과적.
+
+| 데이터 | 캐싱 적합? | 이유 |
+|--------|-----------|------|
+| 술(Alcohol) 정보 | ✅ | 관리자만 수정, 변경 빈도 낮음 |
+| FlavorSuggestion 목록 | ✅ | 거의 바뀌지 않음 |
+| 공개 피드 | ❌ | 실시간으로 계속 바뀜 |
+| 내 노트 목록 | ❌ | 수정/삭제 빈번 |
+
+### 캐시 무효화(Cache Invalidation)
+캐싱의 핵심 어려움 — "언제 캐시를 지울 것인가".
+캐시가 살아있는 동안 원본 데이터가 바뀌면 유저에게 오래된 정보를 보여주게 됨.
+
+해결: 데이터가 바뀌는 시점에 관련 캐시를 명시적으로 삭제.
+```java
+@CacheEvict(value = "alcoholSearch", allEntries = true)
+public void addAlcohol(...) { ... }  // 술 추가 시 검색 캐시 전체 삭제
+```
+
+### 로컬 캐시 vs Redis
+**로컬 캐시(Spring Cache 기본)**: 서버 메모리에 저장.
+- 서버가 1대일 때 충분.
+- 서버가 여러 대이면 각 서버의 캐시가 달라지는 문제 발생.
+
+**Redis**: 별도 캐시 서버에 저장, 모든 서버가 공유.
+- 서버가 여러 대로 늘어날 때 필요.
+- 서버가 재시작돼도 캐시 유지 가능.
+
+TastingNote는 지금 서버 1대 → 로컬 캐시로 시작, 스케일아웃 시 Redis로 전환 예정.
+
+---
+
+## Full-Text Search vs LIKE 검색
+
+### LIKE 검색의 두 가지 문제
+
+**1. 성능 문제**
+```sql
+WHERE name LIKE '%블랙%'
+```
+앞에 `%`가 붙으면 인덱스를 쓸 수 없어서 테이블 전체를 처음부터 끝까지 읽음.
+술 DB가 수천 개 이상 되면 느려짐.
+
+**2. 품질 문제**
+모든 결과를 동등하게 취급 — "블랙라벨" 검색 시 정확히 일치하는 것과 부분 포함하는 것이 순서 없이 섞여 나옴.
+
+### Full-Text Search의 동작 방식
+DB가 미리 각 단어를 쪼개서 **역색인(Inverted Index)** 을 만들어 둠.
+
+```
+[역색인 예시]
+"조니워커" → [alcohol_id: 1]
+"블랙라벨" → [alcohol_id: 1]
+"블랙"     → [alcohol_id: 1, 3, 7]
+"라벨"     → [alcohol_id: 1, 2]
+```
+
+"블랙" 검색 시 → 역색인에서 "블랙" 바로 찾아서 [1, 3, 7] 반환.
+책의 색인에서 단어 찾는 것처럼 빠름 — 전체 스캔 불필요.
+
+### Relevance Score (관련도 점수)
+Full-Text Search는 각 결과에 점수를 매겨서 정렬 가능.
+- 제목에서 검색어와 정확히 일치 → 높은 점수
+- 부분 일치 또는 별칭에서 발견 → 낮은 점수
+
+Vivino가 이 방식으로 와인 검색 결과를 정렬함.
+
+### MySQL Full-Text Search 적용 방법
+```sql
+-- 컬럼에 FULLTEXT 인덱스 추가
+ALTER TABLE alcohol ADD FULLTEXT INDEX ft_name (name, name_ko);
+
+-- 검색 시
+SELECT *, MATCH(name, name_ko) AGAINST('블랙' IN BOOLEAN MODE) AS score
+FROM alcohol
+WHERE MATCH(name, name_ko) AGAINST('블랙' IN BOOLEAN MODE)
+ORDER BY score DESC;
+```
+MySQL 8.0 이상에서 별도 설치 없이 바로 사용 가능.
+
+### 단계적 전환 계획
+1단계: LIKE (현재) — 술 DB가 작을 때
+2단계: MySQL Full-Text Search — 수천 개 이상, 검색 품질 개선 필요할 때
+3단계: Elasticsearch — 수십만 개 이상, 복잡한 검색 로직 필요할 때 (현재 계획 없음)
+
+---
+
+## 다대다(M:N) 관계와 중간 테이블
+
+### 언제 필요한가
+하나의 Note에 여러 FlavorSuggestion이 붙을 수 있고, 하나의 FlavorSuggestion이 여러 Note에 붙을 수 있을 때 — 이게 다대다 관계.
+
+### JPA @ManyToMany를 쓰지 않는 이유
+JPA가 자동으로 중간 테이블을 만들어주지만:
+- 중간 테이블에 컬럼을 추가할 수 없음 (예: type, createdAt)
+- 중간 테이블을 직접 조회/삭제하기 어려움
+- 실무에서는 거의 사용 안 함
+
+### 직접 중간 엔티티를 만드는 방식 (이 프로젝트 선택)
+```
+Note (1) ──── (N) NoteFlavor (N) ──── (1) FlavorSuggestion
+                  ┌──────────────┐
+                  │ note_id      │
+                  │ flavor_id    │
+                  │ type (TASTE/AROMA) │
+                  └──────────────┘
+```
+- NoteFlavor가 독립적인 엔티티라서 직접 조회/삭제 가능
+- type 컬럼으로 맛(TASTE)과 향(AROMA)을 한 테이블에서 구분
+- uniqueConstraint(note_id, flavor_id, type)으로 같은 노트에 같은 맛/향 중복 방지
+
+### 왜 Vivino 방식(선택만)을 선택했나
+자유 텍스트로 저장하면 "바닐라", "바닐라향", "vanilla"가 모두 다른 데이터로 쌓임.
+선택 전용으로 하면 데이터가 일관되어서:
+- "이 술에서 바닐라 향을 느낀 사람이 몇 명인지" 집계 가능
+- Discovery 기능("바닐라 향이 난다고 기록한 노트들")이 정확하게 동작
+- 술 상세 페이지의 맛/향 분포 차트 구현 가능
+
+---
+
+## Pull Request (PR)
+
+### PR이란?
+"이 브랜치의 변경사항을 main에 넣어주세요"라는 **요청서**.
+feature 브랜치에서 개발 완료 후, main에 바로 머지하지 않고 PR을 통해 기록을 남기는 방식.
+
+### 왜 쓰는가?
+- **기록**: GitHub에 PR 페이지가 남아서 "어떤 변경이 왜 들어갔는지" 추적 가능
+- **코드 리뷰**: 팀원이 코드를 보고 댓글/승인 가능 (혼자 개발 시에도 기록용으로 유효)
+- **포트폴리오**: 면접관이 GitHub 볼 때 기능 단위 개발 이력이 명확히 보임
+
+### PR 만드는 방법 (GitHub 웹)
+1. GitHub 레포지토리 페이지 접속
+2. "Compare & pull request" 노란 배너 클릭 (또는 Pull requests 탭 → New pull request)
+3. `base: main` ← `compare: feature/브랜치명` 설정
+4. 제목 + 본문 작성 → Create pull request
+5. 하단 "Merge pull request" → "Confirm merge" 클릭
+
+### 머지 방식 3가지
+| 방식 | 설명 | 언제 쓰는가 |
+|---|---|---|
+| **Create a merge commit** | 머지 커밋 하나 추가, 기존 커밋 유지 | 기본값, 커밋이 의미 있는 단위일 때 |
+| **Squash and merge** | 여러 커밋을 1개로 합쳐서 머지 | 잡다한 커밋이 많을 때 깔끔하게 |
+| **Rebase and merge** | 커밋을 그대로 main에 얹음, 머지 커밋 없음 | 직선 히스토리를 원할 때 |
+
+### 파생 브랜치와 머지 순서
+feature/A에서 feature/B를 파생한 경우 (B가 A의 커밋을 포함):
+- B만 머지해도 A의 커밋이 자동으로 포함됨 (Git은 커밋 단위로 관리)
+- A를 먼저 머지해도 B 머지 시 중복 커밋이 들어가지 않음 (Git이 알아서 건너뜀)
+
+### 로컬 main vs origin/main 차이
+```
+git merge main        ← 내 컴퓨터에 있는 main 기준 (오래됐을 수 있음)
+git merge origin/main ← GitHub에 있는 main 기준 (최신)
+```
+PR 머지 후 다른 브랜치에서 main 내용을 가져올 때는 `git merge origin/main`이 안전.
+`git fetch origin` 먼저 실행하면 origin/main 정보가 갱신됨.
+
+### 머지 충돌(Conflict)이란?
+두 브랜치에서 **같은 파일의 같은 부분**을 서로 다르게 수정했을 때 Git이 어느 쪽을 쓸지 몰라서 사람에게 선택을 맡기는 것.
+
+```
+<<<<<<< HEAD          ← 내 브랜치(현재)의 코드
+현재 브랜치 코드
+=======
+머지하려는 브랜치의 코드
+>>>>>>> origin/main   ← 가져오려는 브랜치의 코드
+```
+
+해결 방법:
+1. 파일을 열어서 `<<<<<<<`, `=======`, `>>>>>>>` 마커를 모두 제거
+2. 최종적으로 남길 코드만 남김 (한쪽 선택 or 두 코드 합치기)
+3. `git add` → `git commit`
+
+---
+
+## 공통 에러 처리 구조 (2026-04-07)
+
+### 왜 만드나?
+
+기존에는 예외를 던질 때 이렇게만 했어요:
+
+```java
+throw new IllegalArgumentException("존재하지 않는 노트입니다");
+```
+
+이 방식의 문제:
+- `IllegalArgumentException`은 무조건 **400**으로 반환됨
+- "노트를 못 찾았다" → 404, "권한 없다" → 403이 맞지만 표현할 방법이 없음
+- 에러 메시지가 코드 여기저기에 흩어져 있어서 관리가 어려움
+
+---
+
+### 구조
+
+```
+ErrorCode (enum)          ← 에러 종류 목록 + 상태코드 + 메시지 한 곳에 관리
+BusinessException         ← ErrorCode를 담아서 던지는 커스텀 예외
+ErrorResponse (record)    ← 에러 발생 시 프론트에 보내는 응답 DTO
+GlobalExceptionHandler    ← BusinessException을 잡아서 응답으로 변환
+```
+
+---
+
+### `ErrorCode.java` — enum
+
+```java
+USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "존재하지 않는 유저입니다")
+EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다")
+FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN, "FORBIDDEN_ACCESS", "접근 권한이 없습니다")
+```
+
+각 에러마다 3가지 정보를 갖고 있음:
+- `HttpStatus` → HTTP 상태코드 (404, 409, 403 등)
+- `code` → 에러 식별 문자열 (프론트에서 분기 처리용)
+- `message` → 사람이 읽는 에러 메시지
+
+**HTTP 상태코드 기준:**
+| 코드 | 의미 | 언제 쓰나 |
+|---|---|---|
+| 400 | Bad Request | 입력값이 잘못됐을 때 |
+| 401 | Unauthorized | 로그인 안 됐거나 토큰이 잘못됐을 때 |
+| 403 | Forbidden | 로그인은 됐지만 권한이 없을 때 (남의 노트 수정 등) |
+| 404 | Not Found | 요청한 리소스가 없을 때 |
+| 409 | Conflict | 중복 데이터 (이미 있는 이메일, 이미 신고한 노트 등) |
+| 500 | Internal Server Error | 서버에서 예상 못한 오류 발생 |
+
+---
+
+### `BusinessException.java` — 커스텀 예외
+
+```java
+// 사용 전
+throw new IllegalArgumentException("존재하지 않는 노트입니다"); // 무조건 400
+
+// 사용 후
+throw new BusinessException(ErrorCode.NOTE_NOT_FOUND); // 자동으로 404
+```
+
+`RuntimeException`을 상속하기 때문에 `throws` 선언 없이 어디서든 던질 수 있음.
+
+---
+
+### `ErrorResponse.java` — record DTO
+
+```java
+public record ErrorResponse(boolean success, String errorCode, String message) {}
+```
+
+**record란?**
+Java 16에서 도입된 문법. 데이터를 담기만 하는 클래스를 한 줄로 선언할 수 있음.
+생성자, getter, equals, hashCode, toString 자동 생성.
+불변(immutable) 객체 — 한번 만들면 값 변경 불가.
+
+에러 응답 형태:
+```json
+{
+  "success": false,
+  "errorCode": "NOTE_NOT_FOUND",
+  "message": "존재하지 않는 노트입니다"
+}
+```
+
+`errorCode`가 있어서 프론트에서 `if (errorCode === 'INVALID_TOKEN') { 로그인페이지로이동() }` 같은 처리 가능.
+
+---
+
+### `GlobalExceptionHandler.java` — 예외 한 곳에서 처리
+
+`@RestControllerAdvice` — 모든 컨트롤러에서 발생하는 예외를 한 곳에서 잡는 어노테이션.
+
+```java
+// BusinessException 발생 시 → ErrorCode의 상태코드로 응답
+@ExceptionHandler(BusinessException.class)
+public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    ErrorCode errorCode = e.getErrorCode();
+    return ResponseEntity.status(errorCode.getStatus())
+            .body(ErrorResponse.of(errorCode));
+}
+
+// @Valid 검증 실패 시 → 400 + 어떤 필드가 잘못됐는지 메시지
+@ExceptionHandler(MethodArgumentNotValidException.class)
+...
+
+// 그 외 예상 못한 모든 예외 → 500
+@ExceptionHandler(Exception.class)
+...
+```
+
+**왜 한 곳에서 처리하나?**
+예외 처리 코드가 각 컨트롤러마다 흩어지면 유지보수가 어려움.
+`@RestControllerAdvice` 하나로 전체 예외를 일관되게 처리할 수 있음.
+
+---
+
+### 전체 흐름 요약
+
+```
+서비스 코드
+  throw new BusinessException(ErrorCode.NOTE_NOT_FOUND)
+        ↓
+GlobalExceptionHandler가 잡음
+        ↓
+ErrorCode에서 HttpStatus.NOT_FOUND(404) 꺼냄
+        ↓
+프론트에 응답:
+{
+  "success": false,
+  "errorCode": "NOTE_NOT_FOUND",
+  "message": "존재하지 않는 노트입니다"
+}
+```
+
+---
+
+## NullPointerException (NPE) 방어 — DTO @NotNull
+
+### NPE란?
+
+Java에서 `null`인 변수를 사용하려 할 때 발생하는 오류.
+
+```java
+List<Long> tasteIds = null;
+
+for (Long id : tasteIds) {  // 💥 NPE 발생! null을 순회할 수 없음
+    ...
+}
+```
+
+### 왜 발생했나?
+
+`NoteCreateRequest`, `NoteUpdateRequest`의 `tasteIds`, `aromaIds` 필드는 기본값으로 `new ArrayList<>()`를 가짐.
+하지만 클라이언트가 JSON에 `"tasteIds": null`을 **명시적으로** 보내면 Jackson이 기본값을 null로 덮어씀.
+그 결과 `NoteService.saveFlavors()` 내부 for-each에서 NPE 발생 → 서버 500 에러.
+
+```json
+// 이런 요청이 오면 서버가 NPE로 터짐
+{
+  "title": "조니워커",
+  "tasteIds": null,
+  "rating": 4.0
+}
+```
+
+### 원칙: 서버는 클라이언트를 믿으면 안 된다
+
+일반 사용자는 프론트 UI를 통해 정상적인 값을 보내지만,
+Swagger나 Postman으로 직접 API에 이상한 값을 보내는 경우를 항상 대비해야 함.
+서버가 NPE로 500 에러를 내는 것보다, 유효성 검사로 400 에러를 반환하는 게 훨씬 안전하고 명확함.
+
+### 해결: @NotNull + 빈 배열 허용
+
+맛/향 선택은 선택 항목(빈 리스트 허용, null만 금지).
+
+```java
+@NotNull(message = "tasteIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
+private List<Long> tasteIds = new ArrayList<>();
+```
+
+| 값 | 결과 |
+|----|------|
+| `null` | ❌ 400 Bad Request (차단) |
+| `[]` | ✅ 정상 처리 (맛/향 없이 저장) |
+| `[1, 3]` | ✅ 정상 처리 (선택한 맛/향 저장) |
+
+### @NotNull vs @NotEmpty 차이
+
+| 어노테이션 | null | 빈 리스트 [] |
+|-----------|------|------------|
+| `@NotNull` | ❌ 차단 | ✅ 허용 |
+| `@NotEmpty` | ❌ 차단 | ❌ 차단 |
+
+맛/향이 선택 항목이므로 `@NotNull`이 적절. 필수 항목으로 바꾸고 싶다면 `@NotEmpty`로 교체하면 됨.
+
+---
+
+## HTTP 상태 코드 구분 기준
+
+### 핵심 원칙
+
+```
+클라이언트 실수 → 400~409
+서버 실수       → 500
+```
+
+### 400 Bad Request — 클라이언트가 잘못 보낸 것
+
+| 상황 | 예시 |
+|------|------|
+| `@NotNull`, `@NotBlank` 등 유효성 검사 실패 | tasteIds에 null 명시 전송 |
+| 잘못된 타입 입력 | 카테고리에 "잘못된값" 입력 |
+| 비즈니스 규칙 위반 입력 | DRAFT 상태 노트를 isPublic=true로 수정 시도 |
+| 이메일/비밀번호 불일치 | 로그인 실패 |
+| 중복 가입 | 이미 사용 중인 이메일/닉네임 |
+
+### 401 Unauthorized — 인증 안 된 것
+
+| 상황 | 예시 |
+|------|------|
+| 유효하지 않은 JWT | 변조된 토큰 |
+| 만료된 JWT | 30분 지난 Access Token |
+
+### 403 Forbidden — 인증은 됐는데 권한 없는 것
+
+| 상황 | 예시 |
+|------|------|
+| 남의 리소스 접근 | 남의 노트 수정/삭제 |
+| 허용되지 않은 행위 | 자기 노트 신고 |
+| 비공개/DRAFT 노트 타인 조회 | |
+
+### 404 Not Found — 존재하지 않는 리소스
+
+| 상황 | 예시 |
+|------|------|
+| 없는 유저 ID | |
+| 없는 노트 ID | |
+| 없는 술 ID | |
+| 없는 맛/향 ID | |
+
+### 409 Conflict — 요청은 맞는데 현재 상태와 충돌
+
+| 상황 | 예시 |
+|------|------|
+| 중복 신고 | 같은 노트 두 번 신고 |
+| (추후) 중복 좋아요 | 이미 좋아요한 노트에 또 좋아요 |
+
+### 500 Internal Server Error — 서버 내부 오류
+
+| 상황 | 예시 |
+|------|------|
+| 예상 못한 모든 예외 | NullPointerException 등 |
+| (추후) 외부 서비스 오류 | S3 이미지 업로드 실패 |
+
+### 앞으로 추가될 ErrorCode
+
+기능 구현 시점에 ErrorCode enum에 추가:
+
+| 기능 | ErrorCode | HTTP |
+|------|-----------|------|
+| AlcoholRequest | `ALCOHOL_REQUEST_NOT_FOUND` | 404 |
+| Like | `ALREADY_LIKED` | 409 |
+| NoteImage (S3) | `IMAGE_UPLOAD_FAILED` | 500 |
 
 ---
 

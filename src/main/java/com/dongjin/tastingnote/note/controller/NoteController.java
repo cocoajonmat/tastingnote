@@ -34,10 +34,12 @@ public class NoteController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(noteService.createNote(userId, request)));
     }
 
-    @Operation(summary = "노트 단건 조회", description = "noteId로 특정 노트를 조회합니다.")
+    @Operation(summary = "노트 단건 조회", description = "noteId로 특정 노트를 조회합니다. 비공개/임시저장 노트는 본인만 조회 가능합니다.")
+    @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/{noteId}")
     public ResponseEntity<ApiResponse<NoteResponse>> getNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(ApiResponse.ok(noteService.getNote(noteId)));
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(noteService.getNote(userId, noteId)));
     }
 
     @Operation(summary = "내 노트 목록 조회", description = "내 노트 전체 또는 상태별로 조회합니다. status 파라미터 없으면 전체 조회, DRAFT 또는 PUBLISHED로 필터링 가능합니다.")
@@ -59,35 +61,39 @@ public class NoteController {
         return ResponseEntity.ok(ApiResponse.ok(noteService.getPublicNotes()));
     }
 
-    @Operation(summary = "노트 수정", description = "노트 내용을 수정합니다. 요청에 포함된 필드만 업데이트됩니다.")
+    @Operation(summary = "노트 수정", description = "노트 내용을 수정합니다. 본인의 노트만 수정 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}")
     public ResponseEntity<ApiResponse<NoteResponse>> updateNote(
             @PathVariable Long noteId,
             @Valid @RequestBody NoteUpdateRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.ok(noteService.updateNote(noteId, request)));
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(noteService.updateNote(userId, noteId, request)));
     }
 
-    @Operation(summary = "노트 발행", description = "DRAFT 상태의 노트를 PUBLISHED 상태로 변경합니다.")
+    @Operation(summary = "노트 발행", description = "DRAFT 상태의 노트를 PUBLISHED 상태로 변경합니다. 본인의 노트만 발행 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}/publish")
     public ResponseEntity<ApiResponse<NoteResponse>> publishNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(ApiResponse.ok(noteService.publishNote(noteId)));
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(noteService.publishNote(userId, noteId)));
     }
 
-    @Operation(summary = "노트 임시저장으로 되돌리기", description = "PUBLISHED 상태의 노트를 DRAFT 상태로 되돌립니다. isPublic이 자동으로 false가 됩니다.")
+    @Operation(summary = "노트 임시저장으로 되돌리기", description = "PUBLISHED 상태의 노트를 DRAFT 상태로 되돌립니다. 본인의 노트만 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @PatchMapping("/{noteId}/unpublish")
     public ResponseEntity<ApiResponse<NoteResponse>> unpublishNote(@PathVariable Long noteId) {
-        return ResponseEntity.ok(ApiResponse.ok(noteService.unpublishNote(noteId)));
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        return ResponseEntity.ok(ApiResponse.ok(noteService.unpublishNote(userId, noteId)));
     }
 
-    @Operation(summary = "노트 삭제", description = "노트를 삭제합니다.")
+    @Operation(summary = "노트 삭제", description = "노트를 삭제합니다. 본인의 노트만 삭제 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{noteId}")
     public ResponseEntity<ApiResponse<Void>> deleteNote(@PathVariable Long noteId) {
-        noteService.deleteNote(noteId);
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        noteService.deleteNote(userId, noteId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 }
