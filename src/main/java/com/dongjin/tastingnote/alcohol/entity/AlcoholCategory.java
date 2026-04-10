@@ -22,9 +22,11 @@ public enum AlcoholCategory {
 
     private final String nameKo;
 
-    public static AlcoholCategory findByNameKo(String keyword) {
+    public static AlcoholCategory findByName(String keyword) {
+        String lower = keyword.toLowerCase();
         for (AlcoholCategory category : values()) {
-            if (category.nameKo.contains(keyword) || keyword.contains(category.nameKo)) {
+            if (category.nameKo.contains(keyword) || keyword.contains(category.nameKo)
+                    || category.name().toLowerCase().contains(lower) || lower.contains(category.name().toLowerCase())) {
                 return category;
             }
         }

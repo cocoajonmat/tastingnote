@@ -29,7 +29,7 @@ public class AlcoholService {
                         .toList()
         );
 
-        AlcoholCategory matchedCategory = AlcoholCategory.findByNameKo(trimmed);
+        AlcoholCategory matchedCategory = AlcoholCategory.findByName(trimmed);
         if (matchedCategory != null) {
             alcoholRepository.findAllByCategory(matchedCategory).stream()
                     .map(AlcoholResponse::from)
