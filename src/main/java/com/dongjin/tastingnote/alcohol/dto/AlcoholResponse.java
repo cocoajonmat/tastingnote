@@ -3,10 +3,12 @@ package com.dongjin.tastingnote.alcohol.dto;
 import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.entity.AlcoholCategory;
 import lombok.Builder;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 @Getter
 @Builder
+@EqualsAndHashCode(of = "id")
 public class AlcoholResponse {
 
     private Long id;
