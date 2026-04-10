@@ -302,7 +302,7 @@ Report → NoteImage → NoteFlavor → Note
      - **승인 (신규 등록)**: 새로운 술 → Alcohol + Alias 생성
      - **별칭으로 병합**: 이미 있는 술 → 기존 Alcohol에 alias만 추가 (mergedToAlcoholId 기록)
      - **거절**: 장난/중복 등
-   - API 4개:
+   - API 5개:
      - POST /api/alcohol-requests — 유저: 술 등록 요청
      - POST /api/admin/alcohol-requests/{id}/approve — 관리자: 승인
      - POST /api/admin/alcohol-requests/{id}/merge?alcoholId= — 관리자: 별칭 병합
@@ -311,19 +311,26 @@ Report → NoteImage → NoteFlavor → Note
    - 초반 운영: 어드민 페이지 없이 Swagger에서 관리자 API 호출
    - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
    - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
-4. TagService / TagController
+4. **술 상세 페이지 API** (AlcoholRequest 직후 확정, 2026-04-10)
+   - AlcoholRequest 완료 후 술 DB가 채워지기 시작해야 의미 있음
+   - AlcoholController에 메서드 3개 추가:
+     - `GET /api/alcohols/{id}/notes` — 해당 술의 공개 노트 목록
+     - `GET /api/alcohols/{id}/stats` — 평균 별점 (노트 5개 이상 시 표시)
+     - `GET /api/alcohols/{id}/flavors` — 맛/향 분포 (NoteFlavor GROUP BY)
+   - 친구와 최종 확인 후 진행
+5. TagService / TagController
    - **결정 필요**: Tag 엔티티에 `count` 필드가 있으나, context.md 확정 내용은 "NoteTag 개수 실시간 카운팅 방식 (Tag 테이블 컬럼 추가 없음)"
      - A안: count 컬럼 유지 — 추가/삭제 시 +1/-1, 조회 빠르지만 동기화 안 맞을 수 있음
      - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
      - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
-5. LikeService / LikeController
+6. LikeService / LikeController
    - **나중에 할 것**: Tag, Like, 피드 API 완성 후 N+1 문제 해결
      - 로컬에서 노트 100개 테스트 데이터 삽입
      - Spring Boot 로그에서 쿼리 수 직접 확인
      - NoteRepository 목록 조회 메서드에 @EntityGraph 적용
      - 101번 → 1번으로 줄어드는 것 로그로 확인
-6. NoteImage S3 업로드
-7. 소셜 로그인 (OAuth2)
+7. NoteImage S3 업로드
+8. 소셜 로그인 (OAuth2)
 
 ---
 

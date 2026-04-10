@@ -235,15 +235,21 @@
 
 ---
 
-**Q16. 술(Alcohol) 상세 페이지를 만들 건지?**
+**Q16. 술(Alcohol) 상세 페이지를 만들 건지? ✅ 부분 확정**
 > 현재 설계에는 술 자체 페이지가 없음 — 술은 노트 작성 시 선택하는 용도로만 사용됨.
 > Vivino는 술 페이지가 핵심 콘텐츠 — 평균 별점, 다른 사람 노트, 맛/향 분포가 술 페이지에 집약됨.
 > 술 상세 페이지가 없으면 같은 술 마신 사람들 노트를 모아볼 수 없고, Discovery 기능(Q3)도 구현이 어려워짐.
-> 구현 난이도는 낮음 — Alcohol 엔티티가 이미 있어서 /api/alcohols/{id}/notes API 하나면 됨.
+> 구현 난이도는 낮음 — AlcoholController에 메서드 추가 수준.
 > 넣는다면 서비스의 깊이가 완전히 달라짐.
-> 술 상세 페이지에 포함할 내용 후보: 다른 유저 노트 목록, 평균 별점, 맛/향 분포
-> 단, 평균 별점은 노트 수가 일정 개수(예: 5개) 이상일 때만 표시 권장 — 데이터 적을 때 낮은 점수가 박히면 신뢰도 하락
-> 친구와 상의 필요.
+>
+> ✅ 확정 — **AlcoholRequest 직후에 구현** (2026-04-10)
+> - 이유: AlcoholRequest 완료 후 술 DB가 채워지기 시작해야 이 API가 실제로 의미 있음
+> - Note.alcohol nullable=false 확정 + NoteFlavor 완성된 지금이 전제조건 갖춰진 시점
+> - API 3개로 구현:
+>   - `GET /api/alcohols/{id}/notes` — 해당 술의 공개 노트 목록
+>   - `GET /api/alcohols/{id}/stats` — 평균 별점 (노트 5개 이상 시 표시)
+>   - `GET /api/alcohols/{id}/flavors` — 맛/향 분포 (NoteFlavor GROUP BY)
+> - 친구와 최종 확인 후 진행
 
 ---
 
