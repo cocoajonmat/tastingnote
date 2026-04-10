@@ -36,7 +36,6 @@ public class NoteCreateRequest {
     private Double rating;
 
     private String description;
-    private Boolean isPublic = false;
     private LocalDate drankAt;
     @Size(max = 100, message = "장소는 100자 이하여야 합니다")
     private String location;

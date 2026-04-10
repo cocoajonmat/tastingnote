@@ -193,7 +193,7 @@ public class NoteService {
 
     // FlavorSuggestion ID 목록으로 NoteFlavor 저장
     private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
-        for (Long flavorId : tasteIds) {
+        for (Long flavorId : tasteIds.stream().distinct().toList()) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()
@@ -202,7 +202,7 @@ public class NoteService {
                     .type(FlavorType.TASTE)
                     .build());
         }
-        for (Long flavorId : aromaIds) {
+        for (Long flavorId : aromaIds.stream().distinct().toList()) {
             FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
             noteFlavorRepository.save(NoteFlavor.builder()

@@ -221,6 +221,7 @@ com.dongjin.tastingnote
 Report → NoteImage → NoteFlavor → NoteTag → Note
 ```
 > NoteImage S3 업로드 구현 시 S3에서도 파일 삭제 로직 추가 필요.
+> **Like 기능 구현 시 반드시 추가**: Like(note_like)도 note_id FK 있음 → LikeService 구현 후 deleteNote()에 `likeRepository.deleteAllByNoteId(noteId)` 추가 필요. 순서: Report → NoteImage → NoteFlavor → NoteTag → Like → Note
 
 ### 알려진 설계 주의사항
 
@@ -231,6 +232,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 | 3 | AlcoholCategory 한글명 | API 응답에 영문 enum만 반환. categoryKo 필드 추가로 해결 → 수정 완료 (2026-04-10) |
 | 4 | 탈퇴 유저 노트 피드 노출 | UserService 탈퇴 구현 시 반드시 모든 노트 isPublic=false 처리 필요 |
 | 5 | 탈퇴 후 Access Token 유효 | 탈퇴해도 기존 Access Token 만료(1시간)까지 API 호출 가능. 탈퇴 기능 구현 시 Access Token 만료 시간 단축(15~30분) 검토 필요 |
+| 8 | 탈퇴 시 닉네임 처리 필수 | nickname 컬럼에 DB UNIQUE 제약 있음. 탈퇴 유저 닉네임을 그대로 두면 다른 사람이 같은 닉네임 가입 시도 시 500 에러. 탈퇴 구현 시 반드시 nickname을 고유값으로 변경 필요 (예: "동진_deleted_42") |
 | 6 | 카테고리 단일 매칭 | AlcoholCategory.findByNameKo()가 첫 번째 매칭 카테고리만 반환. "주" 검색 시 SOJU만 매칭. 복수 카테고리 매칭은 추후 개선 |
 | 7 | 로그인 브루트포스 방어 없음 | Rate limiting 미구현. 서비스 오픈 전 Nginx 또는 AWS WAF 레벨에서 처리 예정 |
 
