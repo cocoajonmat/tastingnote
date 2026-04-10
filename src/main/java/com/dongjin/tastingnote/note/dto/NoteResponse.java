@@ -21,8 +21,8 @@ public class NoteResponse {
     private String alcoholName;
     private String alcoholNameKo;
     private String title;
-    private List<String> tastes;
-    private List<String> aromas;
+    private List<FlavorItem> tastes;
+    private List<FlavorItem> aromas;
     private String pairing;
     private Double rating;
     private String description;
@@ -33,15 +33,28 @@ public class NoteResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    @Getter
+    @Builder
+    public static class FlavorItem {
+        private Long id;
+        private String name;
+    }
+
     public static NoteResponse from(Note note, List<NoteFlavor> flavors) {
-        List<String> tastes = flavors.stream()
+        List<FlavorItem> tastes = flavors.stream()
                 .filter(f -> f.getType() == FlavorType.TASTE)
-                .map(f -> f.getFlavor().getName())
+                .map(f -> FlavorItem.builder()
+                        .id(f.getFlavor().getId())
+                        .name(f.getFlavor().getName())
+                        .build())
                 .toList();
 
-        List<String> aromas = flavors.stream()
+        List<FlavorItem> aromas = flavors.stream()
                 .filter(f -> f.getType() == FlavorType.AROMA)
-                .map(f -> f.getFlavor().getName())
+                .map(f -> FlavorItem.builder()
+                        .id(f.getFlavor().getId())
+                        .name(f.getFlavor().getName())
+                        .build())
                 .toList();
 
         return NoteResponse.builder()

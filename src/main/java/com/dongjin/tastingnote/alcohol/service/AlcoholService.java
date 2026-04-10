@@ -22,13 +22,14 @@ public class AlcoholService {
 
     @Transactional(readOnly = true)
     public List<AlcoholResponse> search(String keyword) {
+        String trimmed = keyword.trim();
         Set<AlcoholResponse> results = new LinkedHashSet<>(
-                alcoholRepository.searchByKeyword(keyword).stream()
+                alcoholRepository.searchByKeyword(trimmed).stream()
                         .map(AlcoholResponse::from)
                         .toList()
         );
 
-        AlcoholCategory matchedCategory = AlcoholCategory.findByNameKo(keyword);
+        AlcoholCategory matchedCategory = AlcoholCategory.findByNameKo(trimmed);
         if (matchedCategory != null) {
             alcoholRepository.findAllByCategory(matchedCategory).stream()
                     .map(AlcoholResponse::from)
