@@ -65,7 +65,7 @@ public class NoteService {
                 .pairing(request.getPairing())
                 .rating(request.getRating())
                 .description(request.getDescription())
-                .isPublic(request.getIsPublic() != null ? request.getIsPublic() : false)
+                .isPublic(false) // 생성 시 항상 비공개, 발행 후 isPublic 변경 가능
                 .drankAt(request.getDrankAt())
                 .location(request.getLocation())
                 .build();

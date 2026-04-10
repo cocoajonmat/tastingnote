@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -19,6 +20,7 @@ public class NoteUpdateRequest {
     private Long alcoholId;
 
     @NotBlank(message = "제목은 필수입니다")
+    @Size(max = 100, message = "제목은 100자 이하여야 합니다")
     private String title;
 
     @NotNull(message = "tasteIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
@@ -37,5 +39,6 @@ public class NoteUpdateRequest {
     @NotNull(message = "isPublic은 null일 수 없습니다")
     private Boolean isPublic;
     private LocalDate drankAt;
+    @Size(max = 100, message = "장소는 100자 이하여야 합니다")
     private String location;
 }

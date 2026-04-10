@@ -6,6 +6,7 @@ import com.dongjin.tastingnote.alcohol.service.AlcoholService;
 import com.dongjin.tastingnote.common.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +27,7 @@ public class AlcoholController {
     @Operation(summary = "술 검색", description = "키워드로 술을 검색합니다. 영문명, 한글명, 별칭(AlcoholAlias)을 통합 검색합니다.")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<AlcoholResponse>>> search(
-            @RequestParam @Size(min = 1, message = "검색어는 1자 이상 입력해주세요") String keyword) {
+            @RequestParam @NotBlank(message = "검색어는 공백일 수 없습니다") @Size(min = 1, message = "검색어는 1자 이상 입력해주세요") String keyword) {
         return ResponseEntity.ok(ApiResponse.ok(alcoholService.search(keyword)));
     }
 
