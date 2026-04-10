@@ -316,6 +316,21 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
     - SignUpRequest: 닉네임 공백 불가 (@Pattern "^\S+$")
     - SignUpRequest: 비밀번호 영문+숫자 필수 (@Pattern)
     - NoteController: createNote Swagger 설명 수정 (status 필드 오해 제거)
+  - 데이터 일관성 수정 (2026-04-10)
+    - Note.saveDraft(): isPublic false로 초기화 (unpublish 시 공개 상태 유지 버그 수정)
+    - NoteService.createNote(): isPublic 항상 false 고정 (DRAFT+isPublic=true 불일치 방지)
+    - NoteService.saveFlavors(): distinct() 추가 (중복 flavorId 방어)
+    - NoteCreateRequest: isPublic 필드 제거 (생성 시 의미 없는 필드 혼란 방지)
+  - 입력 검증 추가 (2026-04-10)
+    - NoteCreateRequest/UpdateRequest: title, location @Size(max=100)
+    - AlcoholController: keyword @NotBlank 추가 (공백 키워드 전체 반환 방지)
+    - AlcoholService.search(): keyword.trim() 적용 (앞뒤 공백 처리)
+    - UserRepository: existsByNicknameAndDeletedAtIsNull 사용 (탈퇴 유저 닉네임 즉시 해제)
+    - UserService.signUp()/login(): email.toLowerCase() 정규화 (대소문자 이메일 통일)
+    - ReportRequest.reasonDetail: @Size(max=500) 추가
+  - 응답 구조 개선 (2026-04-10)
+    - NoteResponse tastes/aromas: List<String> → List<FlavorItem>(id+name) 변경 (수정 화면 복원 지원)
+    - Note.pairing: @Column(columnDefinition = "TEXT") 추가 (VARCHAR 255 제한 제거)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
