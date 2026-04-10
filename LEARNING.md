@@ -1285,3 +1285,63 @@ private void validateRating(Double rating) {
 - 0.5 단위 값들을 10배하면 모두 5의 배수: 1.0→10, 1.5→15, 2.0→20
 - `double` 타입은 부동소수점 오차가 있어서 `(int)(1.5 * 10)`이 14가 될 수 있음
 - `Math.round()`로 반올림 후 나머지 연산하면 오차 없이 정확하게 검증 가능
+
+---
+
+## @Pattern으로 입력값 형식 검증 (2026-04-10)
+
+### 언제 쓰나?
+`@NotBlank`, `@Size`로 막을 수 없는 형식 조건이 있을 때.
+
+### 닉네임 공백 검증
+```java
+@Pattern(regexp = "^\\S+$", message = "닉네임에 공백을 포함할 수 없습니다.")
+private String nickname;
+```
+- `^\\S+$` — 처음부터 끝까지 비공백 문자만 허용
+- `@NotBlank`는 전체가 공백인 " " 케이스만 차단. "닉 네임" 같은 중간 공백은 통과해버림.
+
+### 비밀번호 복잡도 검증
+```java
+@Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "비밀번호는 영문자와 숫자를 포함해야 합니다.")
+private String password;
+```
+- `(?=.*[A-Za-z])` — 영문자가 최소 하나 이상 포함됨을 확인 (lookahead)
+- `(?=.*\\d)` — 숫자가 최소 하나 이상 포함됨을 확인
+- `@Size(min=8)`과 함께 쓰면: "8자 이상 + 영문자 + 숫자" 조건 충족
+
+### lookahead(전방탐색)란?
+`(?=...)` 는 "이 패턴이 어딘가에 있는지 확인만 하고 위치는 이동하지 않음".
+전체 문자열 검사를 여러 조건으로 나눠서 AND 처럼 적용할 수 있음.
+
+---
+
+## 선택적 인증 (Optional Authentication) 패턴 (2026-04-10)
+
+### 언제 필요한가?
+같은 API를 로그인/비로그인 유저가 모두 쓸 수 있지만, 로그인 유저에게는 추가 권한을 주고 싶을 때.
+예: 노트 상세 조회 — 비로그인도 공개 노트를 볼 수 있지만, 본인 노트는 비공개여도 볼 수 있어야 함.
+
+### 구현 방법
+
+**SecurityConfig**: URL을 permitAll()로 열되, 숫자 ID만 허용해서 /my 같은 다른 경로와 충돌 방지.
+```java
+.requestMatchers(new RegexRequestMatcher("/api/notes/\\d+", "GET")).permitAll()
+```
+
+**Controller**: Authentication이 있으면 userId 추출, 없으면 null.
+```java
+Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+Long userId = (auth != null && auth.getPrincipal() instanceof Long)
+        ? (Long) auth.getPrincipal()
+        : null;
+```
+
+**Service**: null-safe 체크로 소유자 여부 판단.
+```java
+boolean isOwner = requesterId != null && note.getUser().getId().equals(requesterId);
+```
+
+**핵심**: `auth.getPrincipal() instanceof Long` 체크가 중요.
+Spring Security는 비로그인 요청에서도 AnonymousAuthenticationToken을 생성하기 때문에,
+auth != null 체크만으로는 충분하지 않음. principal 타입이 Long(userId)인지 확인해야 함.

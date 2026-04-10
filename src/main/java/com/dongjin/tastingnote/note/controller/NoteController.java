@@ -27,7 +27,7 @@ public class NoteController {
 
     private final NoteService noteService;
 
-    @Operation(summary = "노트 생성", description = "새 노트를 생성합니다. status 필드로 DRAFT(임시저장) 또는 PUBLISHED(발행) 선택 가능합니다.")
+    @Operation(summary = "노트 생성", description = "새 노트를 생성합니다. 생성 시 항상 DRAFT(임시저장) 상태로 저장되며, 발행은 /publish 엔드포인트를 사용하세요.")
     @SecurityRequirement(name = "bearerAuth")
     @PostMapping
     public ResponseEntity<ApiResponse<NoteResponse>> createNote(@Valid @RequestBody NoteCreateRequest request) {

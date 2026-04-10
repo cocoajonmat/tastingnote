@@ -73,8 +73,14 @@ public class UserService {
             throw new BusinessException(ErrorCode.EXPIRED_TOKEN);
         }
 
+        User user = refreshToken.getUser();
         refreshTokenRepository.delete(refreshToken);
-        return issueTokens(refreshToken.getUser());
+
+        if (user.getDeletedAt() != null) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        return issueTokens(user);
     }
 
     @Transactional

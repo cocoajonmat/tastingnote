@@ -1,5 +1,6 @@
 앞으로 이 내용을 기반으로 작업해줘.
 반드시 COLLABORATION.md와 FEATURES.md, LEARNING.md도 함께 읽고 시작해줘.
+변경/개선 사항의 이유는 CHANGELOG.md에 기록되어 있어.
 
 ---
 
@@ -300,6 +301,16 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - NoteService.deleteNote(): NoteTag 삭제 추가 (Report → NoteImage → NoteFlavor → NoteTag → Note)
   - AlcoholController: 빈 키워드 검색 방지 (@Validated + @Size(min=1))
   - NoteService: rating 0.5 단위 검증 추가 (1.3점 등 잘못된 값 방지)
+  - SecurityConfig: 비로그인 노트 상세 조회 허용 (RegexRequestMatcher로 /api/notes/{숫자} GET만 허용)
+  - NoteController.getNote(): userId 선택적 추출 (비로그인 시 null 처리)
+  - FlavorSuggestionResponse: id 포함 응답으로 변경 (노트 작성 시 flavorId 필요)
+  - 보안 취약점 수정 (2026-04-10)
+    - ReportService: 비공개/DRAFT 노트 신고 차단 (FORBIDDEN_ACCESS)
+    - ReportService: reason=OTHER 시 reasonDetail 필수 검증
+    - UserService.reissue(): 탈퇴 유저(deletedAt != null) 토큰 재발급 차단
+    - SignUpRequest: 닉네임 공백 불가 (@Pattern "^\S+$")
+    - SignUpRequest: 비밀번호 영문+숫자 필수 (@Pattern)
+    - NoteController: createNote Swagger 설명 수정 (status 필드 오해 제거)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
