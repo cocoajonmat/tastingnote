@@ -239,17 +239,9 @@ Report → NoteImage → NoteFlavor → Note
 - SwaggerConfig JWT 보안 스킴 등록 (Authorize 버튼)
 - Note 엔티티 rating 컬럼 버그 수정 (precision/scale → columnDefinition)
 - feature/jwt-auth → main 머지 완료 (2026-04-02)
-- 현재 작업 브랜치: feature/note-flavor-redesign (미머지, feature/alcohol-api 전체 포함)
-- 공통 에러 처리 구조 추가 (feature/error-handling → main 머지 완료, 2026-04-07, PR #2)
-  - ErrorCode enum (HTTP 상태코드 + 에러코드 + 메시지 한 곳에서 관리)
-  - BusinessException 커스텀 예외 클래스
-  - ErrorResponse record DTO (success, errorCode, message)
-  - GlobalExceptionHandler 업데이트 (BusinessException 처리 추가)
-  - UserService, NoteService, ReportService: IllegalArgumentException → BusinessException 교체
-  - feature/note-flavor-redesign에 origin/main 머지 완료 (충돌 해결)
 - GitHub Actions CI/CD 배포 성공 확인
 - 개발 환경: 노트북 → 데스크탑 전환 완료(대부분 노트북으로 작업 후 데스크탑으로 가져올 예정)
-- feature/flavor-suggestion → main PR 머지 완료 (2026-04-05, GitHub 웹에서 첫 PR)
+- feature/flavor-suggestion → main PR 머지 완료 (PR #1, 2026-04-05, GitHub 웹에서 첫 PR)
 - FlavorSuggestion 엔티티/Repository/Service/Controller 구현 완료 (feature/flavor-suggestion, 2026-04-03)
 - feature/alcohol-api 브랜치 생성 완료 (feature/flavor-suggestion에서 파생)
 - AlcoholRepository/Service/Controller 구현 완료 (feature/alcohol-api, 2026-04-03)
@@ -261,6 +253,16 @@ Report → NoteImage → NoteFlavor → Note
   - SecurityConfig 공개 피드(/api/notes/public) 비로그인 허용 추가
   - DRAFT 상태 노트 isPublic=true 설정 차단 (NoteService updateNote)
 - NoteCreateRequest rating @NotNull 필수 검증 추가 (feature/alcohol-api, 2026-04-03)
+- feature/error-handling → main PR 머지 완료 (PR #2, 2026-04-07)
+  - ErrorCode enum (HTTP 상태코드 + 에러코드 + 메시지 한 곳에서 관리)
+  - BusinessException 커스텀 예외 클래스
+  - ErrorResponse record DTO (success, errorCode, message)
+  - GlobalExceptionHandler 업데이트 (BusinessException 처리 추가)
+  - UserService, NoteService, ReportService: IllegalArgumentException → BusinessException 교체
+- feature/error-notification → main PR 머지 완료 (PR #3, 2026-04-07)
+  - NotificationService — 500 에러 발생 시 Slack Webhook 알림 전송
+  - AppConfig — RestTemplate Bean 등록
+  - SLACK_WEBHOOK_URL 환경변수로 관리
 - Note taste/aroma Vivino 방식으로 재설계 (feature/note-flavor-redesign, 2026-04-05)
   - Note 엔티티 taste/aroma String 필드 제거
   - NoteFlavor 중간 테이블 추가 (FlavorType: TASTE/AROMA)
@@ -284,7 +286,6 @@ Report → NoteImage → NoteFlavor → Note
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
 
-0. **feature/alcohol-api → main PR 머지 대기 중** (flavor-suggestion 커밋 포함, PR로 머지 예정)
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
    - GET /api/alcohols/search?keyword= (name + nameKo + alias 통합 검색)

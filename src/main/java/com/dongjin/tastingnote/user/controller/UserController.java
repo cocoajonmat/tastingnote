@@ -51,4 +51,7 @@ public class UserController {
         userService.logout(userId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
+
+
+
 }
