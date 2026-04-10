@@ -298,6 +298,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - NoteResponse: alcoholName(자유입력) → alcoholName(공식 영문) + alcoholNameKo(공식 한글)
   - ReportRepository.deleteAllByNoteId() 추가
   - NoteService.deleteNote(): Report → NoteFlavor → Note 순서로 삭제 (FK 오류 수정)
+- feature/alcohol-category-search → main PR 머지 완료 (PR #5, 2026-04-10)
 - feature/alcohol-category-search (2026-04-10)
   - AlcoholCategory enum에 한글명 추가 (nameKo 필드, findByNameKo 메서드)
   - AlcoholService.search(): 카테고리 한글명 매칭 추가 (예: "위스키" → WHISKEY 전체 반환)
