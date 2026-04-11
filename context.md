@@ -66,8 +66,9 @@
 - drankAt → 선택
 - isPublic → 공개/비공개 토글, PUBLISHED 상태에서만 의미 있음
 - NoteStatus: DRAFT(임시저장) / PUBLISHED(발행) 구분 유지
-    - DRAFT: 임시저장 상태, isPublic 토글 불가
+    - DRAFT: 임시저장 상태, isPublic 토글 불가 (프론트에서 공개/비공개 UI 비표시)
     - PUBLISHED: 발행 상태, isPublic 토글 가능
+    - **DRAFT로 되돌리기(unpublish) 불가** — 발행 후에는 수정/비공개전환/삭제만 허용 (2026-04-11 결정)
 
 ### NoteFlavor (새 테이블 추가) ✅ 구현 완료
 - Note ↔ FlavorSuggestion 다대다 중간 테이블
@@ -235,6 +236,9 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 | 8 | 탈퇴 시 닉네임 처리 필수 | nickname 컬럼에 DB UNIQUE 제약 있음. 탈퇴 유저 닉네임을 그대로 두면 다른 사람이 같은 닉네임 가입 시도 시 500 에러. 탈퇴 구현 시 반드시 nickname을 고유값으로 변경 필요 (예: "동진_deleted_42") |
 | 6 | 카테고리 단일 매칭 | AlcoholCategory.findByNameKo()가 첫 번째 매칭 카테고리만 반환. "주" 검색 시 SOJU만 매칭. 복수 카테고리 매칭은 추후 개선 |
 | 7 | 로그인 브루트포스 방어 없음 | Rate limiting 미구현. 서비스 오픈 전 Nginx 또는 AWS WAF 레벨에서 처리 예정 |
+| 9 | N+1 SELECT 쿼리 (의도적 보류) | getMyNotes/getPublicNotes에서 노트마다 alcohol/flavor를 개별 쿼리로 조회. 면접 스토리 목적으로 의도적으로 LAZY → @EntityGraph 전환 경험을 남겨둠. FEATURES.md 면접 스토리 #1 참고 |
+| 10 | deleteAllByNoteId 삭제 N+1 | NoteFlavorRepository 등 deleteAllByNoteId()가 내부적으로 SELECT 후 개별 DELETE 반복. @Modifying @Query로 교체 필요 (10회차 발견) |
+| 11 | 목록 조회 정렬 기준 없음 | NoteRepository findAll* 메서드에 ORDER BY 없음. DB 재시작/데이터 변경 시 순서 불일치 가능. OrderByCreatedAtDesc로 수정 필요 (10회차 발견) |
 
 ---
 
