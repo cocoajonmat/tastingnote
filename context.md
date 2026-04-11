@@ -347,6 +347,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - NoteService.saveFlavors(): findAllById + saveAll 벌크 방식으로 전환 + 존재하지 않는 ID 검증 추가
   - NoteController/NoteService: unpublishNote 엔드포인트 제거 (발행 후 DRAFT 복귀 불필요)
   - Note 엔티티: saveDraft() 메서드 제거
+  - RefreshTokenRepository.deleteByUser(): @Modifying(clearAutomatically=true) @Query 방식으로 전환 (derived delete N+1 해결)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
