@@ -71,10 +71,4 @@ public class Note extends BaseEntity {
     public void publish() {
         this.status = NoteStatus.PUBLISHED;
     }
-
-    // 임시저장으로 되돌리기
-    public void saveDraft() {
-        this.status = NoteStatus.DRAFT;
-        this.isPublic = false;
-    }
 }

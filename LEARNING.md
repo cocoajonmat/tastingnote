@@ -165,6 +165,127 @@ DB에 암호화된 값을 저장하고, 로그인 시 입력값을 같은 방식
 
 ---
 
+## ddl-auto — 서버 시작 시 DB 스키마를 어떻게 처리할지 결정
+
+`spring.jpa.hibernate.ddl-auto` 옵션. 서버가 시작될 때 JPA가 코드의 엔티티(예: User.java, Note.java)를 보고 실제 DB 테이블과 비교해서 처리하는 방식을 결정한다.
+
+| 값 | 동작 | 언제 쓰나 |
+|---|---|---|
+| `create` | 기존 테이블 삭제 후 새로 생성 | 테스트 (데이터 매번 초기화) |
+| `create-drop` | 시작 시 생성, 종료 시 삭제 | 단위 테스트 |
+| `update` | 엔티티 변경사항을 DB에 자동 반영 | 개발 초기 (편하지만 위험) |
+| `validate` | 코드와 DB가 일치하는지 확인만, 다르면 서버 시작 거부 | 운영(prod) 권장 |
+| `none` | 아무것도 안 함 | Flyway 같은 별도 마이그레이션 툴 사용 시 |
+
+**왜 prod에서 `update`가 위험한가?**
+실수로 엔티티 필드명을 바꾸거나 삭제하면, 다음 배포 시 DB 컬럼이 자동으로 바뀌거나 삭제될 수 있음. 데이터 손실 위험.
+
+**TastingNote 현재 결정:**
+`update` 유지 (테스트 단계). 서비스 오픈 전 Flyway 도입 후 `validate`로 전환 예정.
+
+**Flyway란?**
+DB 스키마 변경을 SQL 파일로 버전 관리하는 도구. `V1__create_user.sql`, `V2__add_nickname.sql` 처럼 순서대로 관리. 배포 시 아직 실행 안 된 SQL 파일을 자동으로 실행해줌. `ddl-auto: update`처럼 자동이지만 **개발자가 직접 SQL을 작성**하므로 의도치 않은 변경이 없음.
+
+---
+
+## @Modifying — JPA에서 데이터를 변경하는 쿼리임을 선언
+
+Spring Data JPA에서 `@Query`로 직접 쿼리를 작성할 때, SELECT가 아닌 INSERT/UPDATE/DELETE는 반드시 `@Modifying`을 함께 써야 함.
+
+```java
+// 잘못된 예 — @Modifying 없으면 에러 발생
+@Query("DELETE FROM NoteFlavor nf WHERE nf.note.id = :noteId")
+void deleteAllByNoteId(@Param("noteId") Long noteId);
+
+// 올바른 예
+@Modifying(clearAutomatically = true)
+@Query("DELETE FROM NoteFlavor nf WHERE nf.note.id = :noteId")
+void deleteAllByNoteId(@Param("noteId") Long noteId);
+```
+
+**`clearAutomatically = true`가 왜 필요한가?**
+JPA는 1차 캐시(영속성 컨텍스트)에 조회한 엔티티를 저장해둠. `@Modifying`으로 DB에서 데이터를 삭제해도 이 캐시에는 삭제된 데이터가 남아있을 수 있음. 같은 트랜잭션에서 삭제 후 조회하면 이미 지운 데이터가 다시 보이는 현상(유령 데이터)이 발생할 수 있어서, `clearAutomatically = true`로 삭제 후 캐시를 자동 초기화함.
+
+**왜 기본 derived delete가 N+1인가?**
+Spring Data JPA의 `void deleteAllByNoteId(Long noteId)` 같은 메서드명 기반 삭제는 내부적으로:
+1. `SELECT * FROM note_flavor WHERE note_id = ?` (전체 조회)
+2. 조회된 각 행마다 `DELETE FROM note_flavor WHERE id = ?` (개별 삭제)
+
+→ 10개면 쿼리 11번. `@Modifying @Query`는 단 1번의 DELETE 쿼리로 처리.
+
+---
+
+## X-Frame-Options — Clickjacking 방어 HTTP 헤더
+
+`X-Frame-Options`는 내 사이트가 다른 사이트의 `<iframe>` 안에 삽입되는 것을 막는 보안 헤더.
+
+**Clickjacking이란?**
+공격자가 악성 사이트에 내 사이트를 보이지 않는 투명한 iframe으로 올려두고, 사용자가 "경품 당첨" 버튼을 클릭하는 줄 알고 누르면 실제로는 내 사이트의 "계정 삭제" 버튼을 누르게 되는 공격.
+
+```
+X-Frame-Options: DENY      → 어떤 도메인도 iframe 삽입 불가 (가장 강력)
+X-Frame-Options: SAMEORIGIN → 같은 도메인만 iframe 허용
+(없으면)                   → 누구나 iframe에 삽입 가능 (위험)
+```
+
+**TastingNote에서 제거한 이유:**
+H2 콘솔(개발용 DB 관리 UI)이 내부적으로 iframe을 사용해서 `frameOptions().disable()`을 추가했는데, 이게 모든 환경(prod 포함)에 적용됐음. Spring Security 기본값(DENY)으로 복원함.
+
+---
+
+## findAllById / saveAll — 벌크(일괄) 조회 및 저장
+
+`findById`와 `save`를 루프에서 반복 호출하면 N번 쿼리가 발생. `findAllById`와 `saveAll`은 한 번에 처리.
+
+```java
+// 나쁜 예 — 10개면 SELECT 10번
+for (Long id : ids) {
+    repository.findById(id); // 쿼리 1번씩
+}
+
+// 좋은 예 — 한 번에 IN 쿼리로 조회
+repository.findAllById(ids); // SELECT * FROM ... WHERE id IN (1, 2, 3, ...)
+```
+
+```java
+// 나쁜 예 — 10개면 INSERT 10번
+for (Entity e : list) {
+    repository.save(e);
+}
+
+// 좋은 예 — 배치 INSERT
+repository.saveAll(list);
+```
+
+**주의사항:** `findAllById`는 존재하지 않는 ID를 조용히 무시함. 기존 `findById`는 없으면 에러를 던지지만, `findAllById`는 그냥 반환 목록에서 빠짐. 그래서 반환된 개수와 요청한 ID 수를 비교해서 검증해야 함.
+
+```java
+List<FlavorSuggestion> found = repository.findAllById(allIds);
+if (found.size() != allIds.size()) {
+    throw new BusinessException(ErrorCode.FLAVOR_NOT_FOUND); // 없는 ID가 있으면 에러
+}
+```
+
+---
+
+## 목록 정렬 — ORDER BY 없으면 순서가 보장되지 않는다
+
+DB는 `ORDER BY` 없이 조회하면 **내부적으로 편한 순서**로 반환. 이 순서는 DB 버전, 데이터 변경, 서버 재시작 등에 따라 달라질 수 있어서 보장되지 않음.
+
+Spring Data JPA에서 정렬을 메서드명으로 추가하는 방법:
+```java
+// 정렬 없음 (순서 보장 안 됨)
+List<Note> findAllByUserId(Long userId);
+
+// 생성일 내림차순 (최신순)
+List<Note> findAllByUserIdOrderByCreatedAtDesc(Long userId);
+
+// 여러 조건 복합 정렬
+List<Note> findAllByUserIdOrderByCreatedAtDescUpdatedAtDesc(Long userId);
+```
+
+---
+
 ## 앞으로 추가 예정
 
 - ~~`AlcoholService/Controller`~~ ✅ 완료

@@ -24,7 +24,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -97,21 +102,21 @@ public class NoteService {
 
     // 내 노트 전체 조회
     public List<NoteResponse> getMyNotes(Long userId) {
-        return noteRepository.findAllByUserId(userId).stream()
+        return noteRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
                 .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
 
     // 내 노트 상태별 조회 (DRAFT or PUBLISHED)
     public List<NoteResponse> getMyNotesByStatus(Long userId, NoteStatus status) {
-        return noteRepository.findAllByUserIdAndStatus(userId, status).stream()
+        return noteRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, status).stream()
                 .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
 
     // 공개 노트 전체 조회 (소셜 피드)
     public List<NoteResponse> getPublicNotes() {
-        return noteRepository.findAllByIsPublicTrueAndStatus(NoteStatus.PUBLISHED).stream()
+        return noteRepository.findAllByIsPublicTrueAndStatusOrderByCreatedAtDesc(NoteStatus.PUBLISHED).stream()
                 .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
                 .toList();
     }
@@ -163,19 +168,6 @@ public class NoteService {
         return NoteResponse.from(note, flavors);
     }
 
-    // 임시저장으로 되돌리기
-    @Transactional
-    public NoteResponse unpublishNote(Long userId, Long noteId) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
-        if (!note.getUser().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
-        }
-        note.saveDraft();
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
-        return NoteResponse.from(note, flavors);
-    }
-
     // 노트 삭제
     @Transactional
     public void deleteNote(Long userId, Long noteId) {
@@ -193,23 +185,45 @@ public class NoteService {
 
     // FlavorSuggestion ID 목록으로 NoteFlavor 저장
     private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
-        for (Long flavorId : tasteIds.stream().distinct().toList()) {
-            FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
-            noteFlavorRepository.save(NoteFlavor.builder()
+        List<Long> distinctTasteIds = tasteIds.stream().distinct().toList();
+        List<Long> distinctAromaIds = aromaIds.stream().distinct().toList();
+
+        // taste + aroma 전체 ID를 중복 없이 한 번에 조회
+        Set<Long> allIds = new LinkedHashSet<>();
+        allIds.addAll(distinctTasteIds);
+        allIds.addAll(distinctAromaIds);
+
+        if (allIds.isEmpty()) {
+            return;
+        }
+
+        List<FlavorSuggestion> found = flavorSuggestionRepository.findAllById(allIds);
+
+        // 존재하지 않는 ID가 하나라도 있으면 에러
+        if (found.size() != allIds.size()) {
+            throw new BusinessException(ErrorCode.FLAVOR_NOT_FOUND);
+        }
+
+        Map<Long, FlavorSuggestion> flavorMap = found.stream()
+                .collect(Collectors.toMap(FlavorSuggestion::getId, f -> f));
+
+        List<NoteFlavor> noteFlavors = new ArrayList<>();
+
+        for (Long flavorId : distinctTasteIds) {
+            noteFlavors.add(NoteFlavor.builder()
                     .note(note)
-                    .flavor(flavor)
+                    .flavor(flavorMap.get(flavorId))
                     .type(FlavorType.TASTE)
                     .build());
         }
-        for (Long flavorId : aromaIds.stream().distinct().toList()) {
-            FlavorSuggestion flavor = flavorSuggestionRepository.findById(flavorId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.FLAVOR_NOT_FOUND));
-            noteFlavorRepository.save(NoteFlavor.builder()
+        for (Long flavorId : distinctAromaIds) {
+            noteFlavors.add(NoteFlavor.builder()
                     .note(note)
-                    .flavor(flavor)
+                    .flavor(flavorMap.get(flavorId))
                     .type(FlavorType.AROMA)
                     .build());
         }
+
+        noteFlavorRepository.saveAll(noteFlavors);
     }
 }

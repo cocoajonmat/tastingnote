@@ -237,8 +237,8 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 | 6 | 카테고리 단일 매칭 | AlcoholCategory.findByNameKo()가 첫 번째 매칭 카테고리만 반환. "주" 검색 시 SOJU만 매칭. 복수 카테고리 매칭은 추후 개선 |
 | 7 | 로그인 브루트포스 방어 없음 | Rate limiting 미구현. 서비스 오픈 전 Nginx 또는 AWS WAF 레벨에서 처리 예정 |
 | 9 | N+1 SELECT 쿼리 (의도적 보류) | getMyNotes/getPublicNotes에서 노트마다 alcohol/flavor를 개별 쿼리로 조회. 면접 스토리 목적으로 의도적으로 LAZY → @EntityGraph 전환 경험을 남겨둠. FEATURES.md 면접 스토리 #1 참고 |
-| 10 | deleteAllByNoteId 삭제 N+1 | NoteFlavorRepository 등 deleteAllByNoteId()가 내부적으로 SELECT 후 개별 DELETE 반복. @Modifying @Query로 교체 필요 (10회차 발견) |
-| 11 | 목록 조회 정렬 기준 없음 | NoteRepository findAll* 메서드에 ORDER BY 없음. DB 재시작/데이터 변경 시 순서 불일치 가능. OrderByCreatedAtDesc로 수정 필요 (10회차 발견) |
+| 10 | deleteAllByNoteId 삭제 N+1 | ✅ 수정 완료 (10회차) — @Modifying(clearAutomatically=true) @Query 방식으로 전환 |
+| 11 | 목록 조회 정렬 기준 없음 | ✅ 수정 완료 (10회차) — OrderByCreatedAtDesc 추가 |
 
 ---
 
@@ -340,6 +340,14 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
     - AlcoholCategory.findByName(): 영문 카테고리명 매칭 추가 (whiskey, wine 등 영문 검색 가능)
     - CustomAuthenticationEntryPoint: 미인증 요청 시 빈 응답 대신 JSON 에러 반환
     - ErrorCode.UNAUTHORIZED 추가 ("로그인이 필요합니다")
+- fix/10th-session-cleanup (2026-04-11) — 10회차 전체 점검 및 버그 수정
+  - NoteRepository 목록 조회 메서드 전체 OrderByCreatedAtDesc 추가 (정렬 보장)
+  - SecurityConfig X-Frame-Options 비활성화 설정 제거 (Clickjacking 보안 취약점)
+  - NoteFlavorRepository, NoteImageRepository, NoteTagRepository, ReportRepository: deleteAllByNoteId @Modifying @Query 방식으로 전환 (삭제 N+1 해결)
+  - NoteService.saveFlavors(): findAllById + saveAll 벌크 방식으로 전환 + 존재하지 않는 ID 검증 추가
+  - NoteController/NoteService: unpublishNote 엔드포인트 제거 (발행 후 DRAFT 복귀 불필요)
+  - Note 엔티티: saveDraft() 메서드 제거
+  - RefreshTokenRepository.deleteByUser(): @Modifying(clearAutomatically=true) @Query 방식으로 전환 (derived delete N+1 해결)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
