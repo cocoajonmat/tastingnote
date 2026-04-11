@@ -83,14 +83,6 @@ public class NoteController {
         return ResponseEntity.ok(ApiResponse.ok(noteService.publishNote(userId, noteId)));
     }
 
-    @Operation(summary = "노트 임시저장으로 되돌리기", description = "PUBLISHED 상태의 노트를 DRAFT 상태로 되돌립니다. 본인의 노트만 가능합니다.")
-    @SecurityRequirement(name = "bearerAuth")
-    @PatchMapping("/{noteId}/unpublish")
-    public ResponseEntity<ApiResponse<NoteResponse>> unpublishNote(@PathVariable Long noteId) {
-        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        return ResponseEntity.ok(ApiResponse.ok(noteService.unpublishNote(userId, noteId)));
-    }
-
     @Operation(summary = "노트 삭제", description = "노트를 삭제합니다. 본인의 노트만 삭제 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @DeleteMapping("/{noteId}")
