@@ -70,7 +70,7 @@ public class NoteService {
                 .pairing(request.getPairing())
                 .rating(request.getRating())
                 .description(request.getDescription())
-                .isPublic(false) // 생성 시 항상 비공개, 발행 후 isPublic 변경 가능
+                .isPublic(Boolean.TRUE.equals(request.getIsPublic()))
                 .drankAt(request.getDrankAt())
                 .location(request.getLocation())
                 .build();
@@ -130,9 +130,6 @@ public class NoteService {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         validateRating(request.getRating());
-        if (Boolean.TRUE.equals(request.getIsPublic()) && note.getStatus() == NoteStatus.DRAFT) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT);
-        }
 
         Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
