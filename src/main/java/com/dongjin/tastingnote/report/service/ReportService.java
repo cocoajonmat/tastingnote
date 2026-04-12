@@ -12,6 +12,7 @@ import com.dongjin.tastingnote.report.repository.ReportRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,11 +49,15 @@ public class ReportService {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
 
-        reportRepository.save(Report.builder()
-                .reporter(reporter)
-                .note(note)
-                .reason(request.getReason())
-                .reasonDetail(request.getReasonDetail())
-                .build());
+        try {
+            reportRepository.save(Report.builder()
+                    .reporter(reporter)
+                    .note(note)
+                    .reason(request.getReason())
+                    .reasonDetail(request.getReasonDetail())
+                    .build());
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException(ErrorCode.ALREADY_REPORTED);
+        }
     }
 }
