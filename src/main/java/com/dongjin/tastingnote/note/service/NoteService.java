@@ -24,6 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -46,8 +47,10 @@ public class NoteService {
     private final NoteTagRepository noteTagRepository;
 
     // rating 0.5 단위 검증 (1.0, 1.5, 2.0 ... 5.0)
-    private void validateRating(Double rating) {
-        if (Math.round(rating * 10) % 5 != 0) {
+    private static final BigDecimal RATING_STEP = new BigDecimal("0.5");
+
+    private void validateRating(BigDecimal rating) {
+        if (rating.remainder(RATING_STEP).compareTo(BigDecimal.ZERO) != 0) {
             throw new BusinessException(ErrorCode.INVALID_INPUT);
         }
     }

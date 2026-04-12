@@ -1,13 +1,14 @@
 package com.dongjin.tastingnote.note.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,9 +32,9 @@ public class NoteCreateRequest {
     private String pairing;
 
     @NotNull(message = "별점은 필수입니다")
-    @Min(value = 1, message = "별점은 1.0 이상이어야 합니다")
-    @Max(value = 5, message = "별점은 5.0 이하이어야 합니다")
-    private Double rating;
+    @DecimalMin(value = "0.5", message = "별점은 0.5 이상이어야 합니다")
+    @DecimalMax(value = "5.0", message = "별점은 5.0 이하이어야 합니다")
+    private BigDecimal rating;
 
     private String description;
     private LocalDate drankAt;

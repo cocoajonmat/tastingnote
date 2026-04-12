@@ -6,6 +6,7 @@ import com.dongjin.tastingnote.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
@@ -34,8 +35,8 @@ public class Note extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String pairing;
 
-    @Column(columnDefinition = "DECIMAL(2,1)")
-    private Double rating;
+    @Column(nullable = false, precision = 2, scale = 1)
+    private BigDecimal rating;
 
     @Column(columnDefinition = "TEXT")
     private String description;
@@ -55,7 +56,7 @@ public class Note extends BaseEntity {
     private String location;
 
     // 노트 내용 수정
-    public void update(Alcohol alcohol, String title, String pairing, Double rating, String description,
+    public void update(Alcohol alcohol, String title, String pairing, BigDecimal rating, String description,
                        Boolean isPublic, LocalDate drankAt, String location) {
         this.alcohol = alcohol;
         this.title = title;

@@ -7,6 +7,7 @@ import com.dongjin.tastingnote.note.entity.NoteStatus;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,7 +25,7 @@ public class NoteResponse {
     private List<FlavorItem> tastes;
     private List<FlavorItem> aromas;
     private String pairing;
-    private Double rating;
+    private BigDecimal rating;
     private String description;
     private Boolean isPublic;
     private NoteStatus status;
