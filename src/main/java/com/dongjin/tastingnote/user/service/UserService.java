@@ -61,6 +61,8 @@ public class UserService {
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
         }
 
+        // 로그인은 깨끗한 상태에서 시작: 이전 토큰(유효/만료/revoked 모두) 전부 정리
+        refreshTokenRepository.deleteByUser(user);
         return issueTokens(user);
     }
 
@@ -69,18 +71,24 @@ public class UserService {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
 
+        // OAuth 2.0 Security BCP: Refresh Token Reuse Detection
+        // 이미 회전(revoked)된 토큰이 재사용되면 탈취 의심 → 해당 유저의 모든 토큰 무효화
+        if (refreshToken.isRevoked()) {
+            refreshTokenRepository.deleteByUser(refreshToken.getUser());
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
+        }
+
         if (refreshToken.isExpired()) {
-            refreshTokenRepository.delete(refreshToken);
             throw new BusinessException(ErrorCode.EXPIRED_TOKEN);
         }
 
         User user = refreshToken.getUser();
-        refreshTokenRepository.delete(refreshToken);
-
         if (user.getDeletedAt() != null) {
             throw new BusinessException(ErrorCode.USER_NOT_FOUND);
         }
 
+        // 정상 회전: 기존 토큰은 삭제하지 않고 revoked 처리(재사용 감지를 위한 흔적)
+        refreshToken.revoke();
         return issueTokens(user);
     }
 
@@ -94,8 +102,6 @@ public class UserService {
     private TokenResponse issueTokens(User user) {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshTokenValue = jwtTokenProvider.generateRefreshToken(user.getId());
-
-        refreshTokenRepository.deleteByUser(user);
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
