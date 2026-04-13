@@ -59,16 +59,17 @@
   - 이유: 자유입력 허용 시 같은 술이 "조니워커", "JW Black" 등으로 제각각 저장돼 Discovery/통계/술 상세 페이지 기능 불가
   - DB에 없는 술은 AlcoholRequest로 등록 요청 → 승인 후 노트 작성
 - title → 필수
-- rating → 필수, 5점 만점 (1.0~5.0, 0.5단위) — DECIMAL(2,1) 타입
+- rating → 필수, 5점 만점 (0.5~5.0, 0.5단위) — DECIMAL(2,1), Java 타입 BigDecimal (11회차에 Double → BigDecimal 전환)
 - taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
 - drankAt → 선택
-- isPublic → 공개/비공개 토글, PUBLISHED 상태에서만 의미 있음
+- isPublic → 공개 "의도(intent)" 플래그. DRAFT 단계에서도 설정 가능, 실제 피드 노출은 `status=PUBLISHED AND isPublic=true` 조건에서만 발생
 - NoteStatus: DRAFT(임시저장) / PUBLISHED(발행) 구분 유지
-    - DRAFT: 임시저장 상태, isPublic 토글 불가 (프론트에서 공개/비공개 UI 비표시)
-    - PUBLISHED: 발행 상태, isPublic 토글 가능
+    - DRAFT: 임시저장 상태, isPublic 선택 가능 (네이버 블로그/Medium/Facebook 방식 — 작성 단계에서 공개 범위를 미리 저장)
+    - PUBLISHED: 발행 상태, isPublic 자유롭게 전환 가능
     - **DRAFT로 되돌리기(unpublish) 불가** — 발행 후에는 수정/비공개전환/삭제만 허용 (2026-04-11 결정)
+    - **`status`와 `isPublic`은 의미가 완전히 다르다** — `status`는 라이프사이클(완성 여부), `isPublic`은 공개 의도. 11회차에 두 필드를 혼동하던 코드(publish 시 isPublic 동기화 누락, DRAFT isPublic=true 금지)를 정리함
 
 ### NoteFlavor (새 테이블 추가) ✅ 구현 완료
 - Note ↔ FlavorSuggestion 다대다 중간 테이블
@@ -228,7 +229,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 | # | 항목 | 내용 |
 |---|------|------|
-| 1 | rating 0.5 단위 검증 | @Min(1)/@Max(5)만 있고 0.5 단위 검증 없음. 1.3점 같은 값 저장 가능 → 수정 완료 (2026-04-10) |
+| 1 | rating 0.5 단위 검증 | @Min(1)/@Max(5)만 있고 0.5 단위 검증 없음 → 1차 수정(2026-04-10, Double 기반) → 부동소수점 오차로 3.5001 같은 값 통과 가능함을 발견 → BigDecimal로 재전환 + 범위 0.5~5.0 조정 (11회차, 2026-04-12) |
 | 2 | 빈 키워드 검색 | keyword="" 시 LIKE %% → 전체 반환. 최소 1자 검증 추가 필요 → 수정 완료 (2026-04-10) |
 | 3 | AlcoholCategory 한글명 | API 응답에 영문 enum만 반환. categoryKo 필드 추가로 해결 → 수정 완료 (2026-04-10) |
 | 4 | 탈퇴 유저 노트 피드 노출 | UserService 탈퇴 구현 시 반드시 모든 노트 isPublic=false 처리 필요 |
@@ -348,6 +349,28 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - NoteController/NoteService: unpublishNote 엔드포인트 제거 (발행 후 DRAFT 복귀 불필요)
   - Note 엔티티: saveDraft() 메서드 제거
   - RefreshTokenRepository.deleteByUser(): @Modifying(clearAutomatically=true) @Query 방식으로 전환 (derived delete N+1 해결)
+- fix/11th-session-cleanup (2026-04-12) — 11회차 전체 점검 및 버그 수정
+  - Note 작성/발행 플로우 isPublic 동기화 버그 수정 (`7cf8537`)
+    - NoteCreateRequest에 isPublic 필드 추가 — 작성 단계에서 공개 여부 미리 선택(네이버 블로그/Medium 방식)
+    - NoteService.createNote: `.isPublic(false)` 하드코딩 제거 → request 값 사용
+    - NoteService.updateNote: DRAFT 상태에서 isPublic=true 금지하던 의미 없는 제약 제거
+    - 기존에는 publishNote가 status만 PUBLISHED로 바꾸고 isPublic은 false로 남겨두어, 공개 피드에 노트가 노출되지 않는 심각한 버그가 있었음
+  - rating 타입을 Double → BigDecimal로 전환하여 정밀도 보장 (`9b13e50`)
+    - Note 엔티티, DTO(Create/Update/Response) rating 필드 전환
+    - validateRating: `Math.round(rating*10) % 5` → `rating.remainder(new BigDecimal("0.5"))` 방식으로 재작성
+    - @Min/@Max → @DecimalMin/@DecimalMax, 허용 범위 0.5~5.0으로 조정
+    - 이유: Double은 부동소수점 오차로 0.5 단위가 아닌 값(예: 3.5001)이 간헐적으로 통과할 수 있었음. DB 컬럼 DECIMAL(2,1)과 Java 타입 불일치 문제도 함께 해소
+  - Report 중복 신고 TOCTOU race condition 방어 (`025d105`)
+    - Report 엔티티에 `(reporter_id, note_id)` 복합 unique 제약 추가 (`uk_report_reporter_note`)
+    - ReportService.report: save() 호출을 try/catch로 감싸 DataIntegrityViolationException → ALREADY_REPORTED 예외 변환
+    - 이유: 기존에는 existsBy 체크 후 save하는 TOCTOU 패턴에 DB 제약도 없어, 동시 요청 시 중복 신고가 조용히 쌓여 신고 수 부풀리기 어뷰징 가능했음. DB 제약을 최종 방어선으로 두고 서비스는 예외 매핑으로 409 응답 일관성을 유지하는 이중 구조 적용
+  - Refresh Token Rotation + Reuse Detection 적용 (OAuth 2.0 Security BCP) (`c8fb0fe`)
+    - RefreshToken 엔티티에 `revoked` 필드 + `revoke()` 메서드 추가
+    - UserService.reissue: hard delete → `revoke()` 처리 (재사용 감지용 흔적)
+    - reissue 시 이미 revoked된 토큰이 재사용되면 탈취 의심으로 판단하여 해당 유저의 모든 RefreshToken 삭제 → 공격자 세션까지 즉시 차단
+    - login/logout은 기존대로 deleteByUser 유지 (clean slate)
+    - issueTokens 내부의 deleteByUser 호출 제거, 호출자가 명시적으로 정리 (책임 분리)
+    - 이유: 기존에는 공격자가 탈취한 RT로 먼저 reissue하면 정상 유저의 재발급 요청이 조용히 실패할 뿐 탈취 탐지가 불가능했음. OAuth 2.0 Security BCP의 Refresh Token Rotation with Reuse Detection 패턴을 적용
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
@@ -398,6 +421,13 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
      - 101번 → 1번으로 줄어드는 것 로그로 확인
 7. NoteImage S3 업로드
 8. 소셜 로그인 (OAuth2)
+9. **RefreshToken 정리 스케줄러** (11회차에서 Reuse Detection 적용하며 발생)
+   - 11회차 fix에서 reissue 시 hard delete 대신 revoke 처리로 변경
+   - 탈취 감지(Reuse Detection)를 위해 revoked 토큰을 DB에 흔적으로 남겨둠
+   - 결과: 만료되거나 revoked된 토큰이 DB에 누적됨
+   - 해결: `@Scheduled`로 주기적(예: 하루 1회) cleanup 작업 필요
+     - `expires_at < now()` OR `revoked = true AND updated_at < now() - 7일` 삭제
+   - 참고: OAuth 2.0 Security BCP — Refresh Token Rotation with Reuse Detection
 
 ---
 

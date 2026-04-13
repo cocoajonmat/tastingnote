@@ -252,6 +252,60 @@ DRAFT 상태에서는 프론트엔드에서 공개/비공개 UI를 애초에 안
 
 ---
 
+## 2026-04-12 — 노트 작성/수정 시 isPublic 동기화 버그 수정
+
+**결정**: NoteCreateRequest에 isPublic 필드 부활, createNote 하드코딩 제거, updateNote에서 DRAFT+isPublic=true 금지 제약 제거
+
+**이유**: 10회차에 "DRAFT 단계에서 isPublic=true는 의미 없는 불일치"라는 판단으로 isPublic 필드를 제거하고 createNote에서 false로 고정, updateNote에서도 DRAFT 공개 전환을 차단했음. 그런데 publishNote()는 status만 PUBLISHED로 바꾸고 isPublic은 건드리지 않기 때문에, 결과적으로 **공개 노트를 만드는 경로 자체가 존재하지 않는** 심각한 버그 상태였음. 공개 피드 쿼리(`status=PUBLISHED AND isPublic=true`)를 통과하는 노트가 생길 수 없었음.
+
+실제 서비스 사례(네이버 블로그/티스토리/벨로그/Medium/Facebook)를 조사한 결과, 대부분 임시저장 단계에서 공개 여부를 **함께 저장**하는 방식이었음. `status`와 `isPublic`은 의미적으로 완전히 다른 필드다:
+- `status`: 라이프사이클 (DRAFT = 작성 중, PUBLISHED = 발행됨)
+- `isPublic`: 공개 "의도(intent)" — 발행 시점에 피드에 노출할지 여부
+
+DRAFT 상태에서 isPublic=true인 데이터가 생겨도 피드 쿼리가 status 조건을 걸어 막아주므로 노출 위험이 없음. 10회차에 "불일치 방지"라 부르던 방어는 실제로는 과한 제약이었음.
+
+**대안**: `publishNote`에 isPublic 파라미터를 추가(A안)하는 방법도 있었으나, "작성 단계에서 공개 여부를 미리 정한다"는 인스타/블로그식 UX가 사용자 기대에 더 부합하고 프론트 구현도 단순해지므로 B안(DTO에 isPublic 복원) 선택.
+
+---
+
+## 2026-04-12 — rating 타입을 Double → BigDecimal로 전환 (정밀도 보장)
+
+**결정**: Note 엔티티, NoteCreateRequest/UpdateRequest/Response의 rating 필드를 BigDecimal로 변경. validateRating을 `BigDecimal.remainder(new BigDecimal("0.5"))` 기반으로 재작성. @Min/@Max → @DecimalMin/@DecimalMax. 허용 범위 0.5~5.0으로 조정.
+
+**이유**: 10회차에 `Math.round(rating * 10) % 5 != 0` 방식의 0.5 단위 검증을 도입했으나, Double은 IEEE 754 부동소수점 타입이라 정확한 값을 못 담음. `3.5001` 같은 값이 들어오면 `35.00100...` → `Math.round → 35` → `35 % 5 == 0` 으로 통과해 버리는 위험이 간헐적으로 존재했음.
+
+별점처럼 **정확한 단위가 있는 수치**는 애초에 Double로 다루면 안 되는 유형. 금액/수량/점수 같은 값은 실무에서 BigDecimal을 쓰는 게 표준. DB 컬럼이 DECIMAL(2,1)인데 Java 쪽이 Double이어서 타입 불일치로 DB 정밀도의 의미가 희석되던 문제도 함께 해소됨.
+
+범위는 0개 별(0.0)이 "미평가"와 혼동되므로 대부분 서비스가 0.5부터 허용하는 관례를 따라 0.5~5.0으로 조정.
+
+---
+
+## 2026-04-12 — Report 중복 신고 TOCTOU race condition 방어 및 DB unique 제약 추가
+
+**결정**: Report 엔티티에 `(reporter_id, note_id)` 복합 unique 제약(`uk_report_reporter_note`) 추가. ReportService.report에서 save()를 try/catch로 감싸 DataIntegrityViolationException → ALREADY_REPORTED(409) 예외로 변환.
+
+**이유**: 기존 코드는 `existsByReporterIdAndNoteId` 체크 후 `save`하는 전형적인 TOCTOU(Time-Of-Check to Time-Of-Use) 패턴이었고, 엔티티에 unique 제약이 **아예 없었음**. 두 요청이 거의 동시에 도착하면 둘 다 exists 체크를 통과해 양쪽 다 save되고, DB 제약도 없어서 **중복 신고가 조용히 쌓이는** 상황이었음. 같은 유저가 신고 버튼을 연타해 신고 수를 부풀리는 어뷰징이 가능한 상태.
+
+DB unique 제약을 진실의 원천(source of truth)으로 두고, 서비스 레벨 `existsBy` 검증은 정상 케이스에서 빠른 에러 응답을 위한 UX 계층으로 유지. 동시성 충돌이 발생하면 save() 단계에서 `DataIntegrityViolationException`이 터지고, 이를 catch해 사용자에게는 `ALREADY_REPORTED` 비즈니스 예외로 변환해 일관된 409 Conflict를 반환. 앱 레벨 검증(UX) + DB 제약(정합성)의 이중 구조가 실무 정석.
+
+---
+
+## 2026-04-12 — Refresh Token Rotation + Reuse Detection (OAuth 2.0 Security BCP)
+
+**결정**: RefreshToken 엔티티에 `revoked` boolean 필드와 `revoke()` 메서드 추가. UserService.reissue에서 hard delete 대신 revoke 처리로 변경. 이미 revoked된 토큰이 다시 사용되면 탈취 의심으로 판단해 해당 유저의 모든 RefreshToken을 삭제(deleteByUser). login/logout은 기존대로 deleteByUser 유지. issueTokens 내부의 deleteByUser 호출은 제거하고 호출자(login)가 명시적으로 정리하도록 책임 분리.
+
+**이유**: 기존 구조는 reissue 시점에 기존 RT를 즉시 hard delete하고 새 RT를 발급하는 방식이었음. 이 구조에서 공격자가 RT1을 탈취해 먼저 reissue를 호출하면, RT1이 삭제되고 RT2가 공격자에게 발급됨. 이후 정상 유저가 RT1로 reissue를 시도하면 `findByToken(RT1)`이 비어 있어 `INVALID_TOKEN` 에러만 반환되고, **탈취 사실을 전혀 탐지하지 못함**. 공격자는 RT2를 가지고 정상 유저가 재로그인할 때까지 자유롭게 활동 가능.
+
+OAuth 2.0 Security BCP(RFC 6819 + draft-ietf-oauth-security-topics)의 Refresh Token Rotation with Reuse Detection 패턴을 적용:
+- reissue 정상 경로: 현재 토큰을 `revoked=true`로 표시(삭제 안 함) + 새 토큰 발급
+- revoked된 토큰이 다시 reissue 요청으로 들어오면 **재사용 감지** → 해당 유저의 모든 RT 삭제 → 공격자가 보유한 RT2도 함께 무효화 → 정상 유저는 재로그인 필요하지만 공격자는 완전 차단
+
+issueTokens 내부의 deleteByUser를 빼고 login이 명시적으로 호출하게 바꾼 것은 reissue 정상 경로에서 의도치 않게 revoked 흔적까지 삭제되지 않도록 책임을 분리한 것.
+
+**부수 효과**: revoked 토큰이 DB에 누적됨. 주기적으로 만료/revoked 토큰을 정리하는 스케줄러가 필요. context.md "다음 순서 9번"에 TODO로 기록.
+
+---
+
 ## 보류 결정 (추후 처리 예정)
 
 ### 탈퇴 후 Access Token 유효 문제

@@ -1388,11 +1388,13 @@ public class AlcoholController {
 
 ---
 
-## rating 0.5 단위 검증 (2026-04-10)
+## rating 0.5 단위 검증 (2026-04-10, 11회차에 BigDecimal로 재작성)
 
 ### 왜?
 `@Min(1)`, `@Max(5)`만으로는 1.3점, 2.7점 같은 잘못된 값을 막을 수 없어요.
-0.5 단위인지 검증하는 로직을 서비스에서 직접 처리했어요.
+0.5 단위인지 검증하는 로직을 서비스에서 직접 처리해야 해요.
+
+### 10회차 — Double + Math.round 방식 (지금은 버려진 접근)
 
 ```java
 private void validateRating(Double rating) {
@@ -1402,10 +1404,41 @@ private void validateRating(Double rating) {
 }
 ```
 
-**왜 `Math.round(rating * 10) % 5`인가?**
-- 0.5 단위 값들을 10배하면 모두 5의 배수: 1.0→10, 1.5→15, 2.0→20
-- `double` 타입은 부동소수점 오차가 있어서 `(int)(1.5 * 10)`이 14가 될 수 있음
-- `Math.round()`로 반올림 후 나머지 연산하면 오차 없이 정확하게 검증 가능
+- 0.5 단위 값을 10배하면 모두 5의 배수: 1.0→10, 1.5→15
+- `Math.round()`로 반올림해서 정수 나머지 연산
+
+처음엔 이게 괜찮아 보였는데, 11회차에 다시 보니까 **여전히 뚫리는 값**이 있었어요. 예를 들어 `3.5001`을 보내면:
+- `3.5001 * 10 = 35.001...`
+- `Math.round(35.001) = 35`
+- `35 % 5 == 0` → **통과해버림**
+
+클라이언트가 0.5 단위가 아닌 값을 실수로(혹은 의도적으로) 보낼 때 **간헐적으로 방어가 뚫리는** 상태였고, 반올림 과정에서 "잘못된 입력을 조용히 정상값으로 변환해서 받는" 나쁜 설계이기도 했어요.
+
+### 11회차 — BigDecimal로 전환 (2026-04-12)
+
+```java
+private static final BigDecimal RATING_STEP = new BigDecimal("0.5");
+
+private void validateRating(BigDecimal rating) {
+    if (rating.remainder(RATING_STEP).compareTo(BigDecimal.ZERO) != 0) {
+        throw new BusinessException(ErrorCode.INVALID_INPUT);
+    }
+}
+```
+
+**핵심 변화**
+- DTO/엔티티의 `rating` 타입을 `Double` → `BigDecimal`로 전환
+- 검증도 `BigDecimal.remainder`로 정확히 계산
+- `@Min`/`@Max` → `@DecimalMin`/`@DecimalMax`로 변경 (BigDecimal용)
+- 허용 범위 0.5 ~ 5.0
+
+**왜 BigDecimal이어야 하나?**
+- `Double`은 IEEE 754 부동소수점. `0.1 + 0.2 = 0.30000000000000004` 같은 오차가 발생.
+- 별점처럼 **정확한 단위가 있는 수치**(금액, 수량, 점수)는 실무에서 모두 `BigDecimal`을 써요.
+- DB 컬럼이 `DECIMAL(2,1)`인데 Java 쪽이 `Double`이면 타입 불일치로 DB 정밀도가 의미 없음. `BigDecimal ↔ DECIMAL`이 자연스러운 대응.
+- `BigDecimal("3.5001")`은 값을 문자열 그대로 저장하므로 `remainder(0.5)`가 `0.0001`로 정확히 나와서 거절됨.
+
+**교훈**: "부동소수점으로 정확한 단위 검증하려는 시도 자체가 안티패턴." 타입 선택이 잘못되면 아무리 트릭을 써도 완벽히 방어할 수 없다.
 
 ---
 
@@ -1466,3 +1499,258 @@ boolean isOwner = requesterId != null && note.getUser().getId().equals(requester
 **핵심**: `auth.getPrincipal() instanceof Long` 체크가 중요.
 Spring Security는 비로그인 요청에서도 AnonymousAuthenticationToken을 생성하기 때문에,
 auth != null 체크만으로는 충분하지 않음. principal 타입이 Long(userId)인지 확인해야 함.
+
+---
+
+## 상태 머신 설계 — 라이프사이클과 공개 의도는 다른 차원 (2026-04-12)
+
+### 배경
+노트는 두 가지 "상태"를 가져요.
+- `status` (NoteStatus): DRAFT / PUBLISHED — **라이프사이클**
+- `isPublic` (boolean): true / false — **공개 의도**
+
+처음에는 이 둘이 비슷해 보여서 "DRAFT면 당연히 비공개지!" 하고 엮었는데, 11회차에 심각한 버그가 있다는 걸 발견했어요.
+
+### 10회차에 저지른 실수
+- `createNote()`에서 `isPublic`을 항상 `false`로 고정
+- `updateNote()`에서 DRAFT 상태에 `isPublic=true` 설정을 아예 차단
+- `publishNote()`는 `status`만 PUBLISHED로 바꾸고 `isPublic`은 건드리지 않음
+
+결과: **공개 노트를 만드는 경로 자체가 존재하지 않았음.** 공개 피드 쿼리가 `status=PUBLISHED AND isPublic=true`인데, 어떤 노트도 이 조건을 만족할 수 없었어요.
+
+### 왜 엮으면 안 되나?
+두 필드는 의미가 다른 차원이에요.
+
+| 필드 | 의미 | 언제 바뀌나 |
+|---|---|---|
+| `status` | 작성이 끝났나? (완성도/라이프사이클) | DRAFT → PUBLISHED (한 방향) |
+| `isPublic` | 피드에 노출할 생각인가? (공개 의도) | 언제든 true/false 자유 전환 |
+
+DRAFT이면서 isPublic=true인 상태는 "아직 작성 중이지만 완성하면 공개할 생각" 이라는 **의도(intent)** 를 표현해요. 실제 노출은 `status=PUBLISHED` 조건에서만 일어나므로 안전해요.
+
+### 실제 서비스 사례
+- **네이버 블로그 / 티스토리 / 벨로그 / 브런치**: 임시저장 시 공개 설정도 함께 저장
+- **Medium**: Draft에 Public/Unlisted 지정 가능
+- **Facebook**: Draft에 Audience(공개 범위) 저장
+- 공통 패턴: **"Draft + visibility intent"** 를 함께 저장
+
+### 11회차 수정
+- `NoteCreateRequest`에 `isPublic` 필드 복원
+- `createNote()`에서 하드코딩 제거 → 요청값 사용
+- `updateNote()`에서 DRAFT+isPublic=true 금지 제약 제거
+- 피드 쿼리는 이미 `status=PUBLISHED AND isPublic=true`라 변경 불필요
+
+### 교훈
+**도메인 모델에서 의미가 다른 두 필드를 "비슷해 보인다"고 엮으면 버그가 난다.** 필드 각각에 "이건 뭘 의미하나? 언제 바뀌나? 누가 결정하나?"를 물어봐서 차원이 다르면 독립적으로 다뤄야 함.
+
+---
+
+## TOCTOU (Time-Of-Check to Time-Of-Use) 패턴과 방어 (2026-04-12)
+
+### 개념
+**"확인한 시점"과 "사용하는 시점" 사이에 상태가 바뀔 수 있다**는 고전 동시성/보안 버그 패턴.
+
+```java
+if (repository.existsBy(...)) {    // ← Check
+    throw new BusinessException(...);
+}
+// ← 이 틈에 다른 요청이 먼저 save 가능
+repository.save(...);              // ← Use
+```
+
+유닉스 파일 시스템 보안 버그에서 유명해진 용어. "파일 권한 체크" 후 "파일 열기" 사이에 공격자가 심볼릭 링크로 교체하는 공격이 대표적. 보안 면접에서도 키워드로 자주 등장.
+
+### TastingNote 사례 — 중복 신고
+Report 생성 로직이 이렇게 되어 있었어요:
+```java
+if (reportRepository.existsByReporterIdAndNoteId(reporterId, noteId)) {
+    throw new BusinessException(ErrorCode.ALREADY_REPORTED);
+}
+reportRepository.save(newReport);
+```
+
+유저가 "신고" 버튼을 더블클릭하거나 네트워크 지연으로 같은 요청이 2번 도착하면:
+1. 요청 A: exists → 없음 → 통과
+2. 요청 B: exists → 아직 A가 저장 전 → 없음 → 통과
+3. 요청 A: save 성공
+4. 요청 B: save 성공 ← 중복!
+
+**게다가 Report 엔티티에 unique 제약도 없었음** → 중복이 조용히 DB에 쌓여서 같은 유저가 같은 노트를 여러 번 신고한 걸로 기록될 수 있었어요. 신고 수 부풀리기 어뷰징이 가능한 상태.
+
+### 해결 원칙
+TOCTOU의 방어 원칙은 두 가지:
+1. **체크와 사용을 원자적(atomic)으로 묶기** — 락(Optimistic/Pessimistic), 트랜잭션 격리 수준 올리기
+2. **DB 제약을 최종 방어선으로 두기** — unique, check, foreign key 등
+
+Report는 1번을 적용하면 성능 부담이 너무 커요(락 걸 만큼 중요한 작업도 아님). 그래서 2번 방식을 선택했어요.
+
+### 구현
+**엔티티에 unique 제약 추가**:
+```java
+@Table(
+    name = "report",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uk_report_reporter_note",
+        columnNames = {"reporter_id", "note_id"}
+    )
+)
+```
+
+**서비스에서 예외 변환**:
+```java
+try {
+    reportRepository.save(report);
+} catch (DataIntegrityViolationException e) {
+    throw new BusinessException(ErrorCode.ALREADY_REPORTED);
+}
+```
+
+### 이중 구조의 의미
+- **앱 레벨 `existsBy` 검증**: 정상 케이스(99.99%)에서 빠른 에러 응답 제공 (UX 계층)
+- **DB unique 제약**: 동시 요청 시 최종 방어선 (정합성 계층 — source of truth)
+
+DB가 진실의 원천, 서비스 검증은 UX를 위한 빠른 경로. 실무 정석 패턴이에요.
+
+### 교훈
+- `existsBy + save` 조합을 볼 때마다 "여기 TOCTOU 아닌가?" 를 의심해야 함.
+- DB unique 제약은 "혹시 몰라서" 수준이 아니라 **반드시 설계 단계에서 정해야 하는 도메인 제약**.
+- 예외 기반 제어(`try/catch`)는 정상 플로우에는 부담이지만, 동시성 충돌처럼 드물게 발생하는 경쟁 상태에는 적절한 도구.
+
+---
+
+## OAuth 2.0 Refresh Token Rotation + Reuse Detection (2026-04-12)
+
+### 왜 이 패턴이 필요한가?
+JWT 인증에서 Access Token은 짧은 수명(예: 1시간), Refresh Token은 긴 수명(예: 30일). Refresh Token이 탈취되면 공격자가 30일 동안 Access Token을 계속 발급받을 수 있어요. **탈취를 빨리 감지하고 즉시 대응하는 메커니즘이 필요**.
+
+### 기존 방식의 한계 (10회차까지)
+```java
+public TokenResponse reissue(String rtValue) {
+    RefreshToken rt = findByToken(rtValue).orElseThrow(...);
+    refreshTokenRepository.delete(rt);  // hard delete
+    return issueTokens(user);           // 새 토큰 발급
+}
+```
+
+시나리오:
+1. 정상 유저가 RT1 발급받음
+2. 공격자가 RT1 탈취 (XSS, 네트워크 가로채기 등)
+3. 공격자가 먼저 reissue(RT1) → RT1 삭제, RT2가 공격자에게 발급
+4. 정상 유저가 reissue(RT1) → `findByToken(RT1)` → 없음 → `INVALID_TOKEN`
+5. 정상 유저는 "어? 로그인 풀렸네" 하고 재로그인
+6. 공격자는 그 사이 RT2로 자유롭게 활동 가능
+
+**문제**: 탈취 감지 불가. 정상 유저가 재로그인할 때까지 공격자는 그대로.
+
+### OAuth 2.0 Security BCP 표준 방식
+RFC 6819 + draft-ietf-oauth-security-topics가 권장하는 패턴.
+
+**핵심 아이디어**: 이미 한 번 사용(rotated)된 Refresh Token이 또 쓰이면 = 탈취 의심 → 해당 유저의 모든 토큰 즉시 무효화.
+
+**구현 변경점**:
+1. `RefreshToken` 엔티티에 `revoked` boolean 필드 추가
+2. `reissue()`에서 hard delete 대신 `revoke()` 처리 (삭제 안 하고 흔적 남김)
+3. `findByToken`이 revoked 토큰을 찾으면 → **탈취 감지** → 해당 user의 모든 RT 삭제 → 정상/공격자 모두 쫓겨남
+
+```java
+public TokenResponse reissue(String rtValue) {
+    RefreshToken rt = refreshTokenRepository.findByToken(rtValue)
+        .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_TOKEN));
+
+    // 탈취 감지: 이미 revoke된 토큰이 재사용됨
+    if (rt.isRevoked()) {
+        refreshTokenRepository.deleteByUser(rt.getUser());
+        throw new BusinessException(ErrorCode.INVALID_TOKEN);
+    }
+    if (rt.isExpired()) {
+        throw new BusinessException(ErrorCode.EXPIRED_TOKEN);
+    }
+    User user = rt.getUser();
+    if (user.getDeletedAt() != null) {
+        throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+    }
+
+    // 정상 회전: 현재 토큰을 revoke (삭제 X, 흔적으로 남김) + 새 토큰 발급
+    rt.revoke();
+    return issueTokens(user);
+}
+```
+
+### 공격 시나리오 재실행 (개선 후)
+1. 정상 유저 RT1 발급
+2. 공격자 RT1 탈취
+3. 공격자 reissue(RT1) → RT1 revoked 표시 + RT2 발급 (공격자 보유)
+4. 정상 유저 reissue(RT1) → `findByToken(RT1)` → **revoked 발견!** → 해당 user의 모든 RT 삭제(RT2 포함) → `INVALID_TOKEN`
+5. 정상 유저는 재로그인 필요하지만, **공격자도 즉시 쫓겨남** (RT2가 함께 삭제됨)
+
+탈취된 토큰이 두 번째로 쓰이는 순간을 탐지 신호로 삼는 게 핵심.
+
+### 책임 분리
+기존 `issueTokens()` 내부에서 `deleteByUser()`를 호출했는데, 이를 제거하고 호출자가 명시적으로 정리하도록 바꿨어요.
+- `login()`: `deleteByUser` 호출 후 `issueTokens` — clean slate로 시작
+- `reissue()` 정상 경로: 개별 토큰 `revoke()`만 하고 `issueTokens` 호출 — 흔적 유지
+
+`issueTokens`가 암묵적으로 DB를 정리하면 reissue 정상 경로에서도 흔적이 지워져서 재사용 감지가 불가능해짐. 책임을 분리해서 각 경로의 정리 정책을 명확히 함.
+
+### 부수 효과와 TODO
+revoked 토큰이 DB에 누적되므로 주기적 cleanup이 필요해요.
+- `@Scheduled`로 하루 1회 `expires_at < now()` 또는 `revoked = true AND 오래됨` 조건으로 삭제
+- context.md "다음 순서 9번"에 TODO로 기록
+
+### 실제 서비스 사례
+- **Auth0 / Okta**: Refresh Token Rotation이 기본. reuse detection을 "revocation chain"이라 부름
+- **Google OAuth**: 비슷한 개념을 암묵적으로 적용
+- **AWS Cognito**: `EnableTokenRevocation` 옵션으로 활성화
+
+### 교훈
+- 보안은 "뚫리는지"보다 "**뚫렸을 때 얼마나 빨리 감지하고 대응할 수 있는지**"가 더 중요.
+- Hard delete는 편하지만 "흔적이 남지 않는다"는 단점이 있음. 감사/탐지 목적일 땐 soft delete가 더 강력.
+- OAuth 2.0 Security BCP처럼 **업계 표준 패턴**이 있는 영역은 자기류로 만들지 말고 표준을 그대로 따르는 게 안전. 표준은 수많은 공격 시나리오를 반영한 결과물.
+
+---
+
+## BigDecimal vs Double — 정확한 수치는 정확한 타입으로 (2026-04-12)
+
+### 언제 BigDecimal을 써야 하나?
+**"단위가 정해진 정확한 수치"** 를 다룰 때. 대표적으로:
+- 금액(원, 달러)
+- 수량(개, 인원)
+- 점수/별점(0.5 단위)
+- 백분율, 세율 등
+
+반대로 **연속적인 측정값**(거리, 속도, 온도, 확률 등)은 `Double`로 충분해요. 약간의 오차가 큰 문제가 안 되니까.
+
+### Double의 함정
+`Double`은 IEEE 754 부동소수점. 유한한 비트로 무한한 실수를 표현하려다 보니 오차가 불가피해요.
+```java
+System.out.println(0.1 + 0.2);  // 0.30000000000000004
+System.out.println(3.5001 * 10); // 35.001000000000005
+```
+`1.5`라는 값조차 내부적으로는 정확히 저장되지 않아요. 그래서 `==` 비교, 나머지 연산, 누적 덧셈 같은 연산에서 직관과 어긋나는 결과가 나옴.
+
+### BigDecimal의 원리
+값을 `unscaled value (정수) + scale (10의 몇 제곱)` 형태로 저장해요.
+- `new BigDecimal("1.5")` → unscaledValue=15, scale=1 → 값 = 15 × 10⁻¹ = 1.5 (정확)
+- 생성 시 **반드시 `String` 생성자를 써야** 함. `new BigDecimal(1.5)`(Double 생성자)는 이미 Double 오차가 들어간 값을 받아오니까 의미 없음.
+
+### DB 타입 대응
+```
+Java BigDecimal  ↔  SQL DECIMAL / NUMERIC
+Java Double      ↔  SQL DOUBLE / REAL
+```
+DB 컬럼이 `DECIMAL(2,1)`이면 Java 필드도 `BigDecimal`이어야 정밀도가 유지돼요. `Double`로 받으면 JPA가 내부 변환을 하면서 오차가 생길 수 있음.
+
+### TastingNote 적용 사례
+- `Note.rating` — 0.5 단위 별점
+- 검증: `rating.remainder(new BigDecimal("0.5")).compareTo(BigDecimal.ZERO) != 0`
+- Bean Validation: `@DecimalMin("0.5")`, `@DecimalMax("5.0")`
+
+### 주의할 것들
+- **비교는 `compareTo()` 써라.** `equals()`는 scale도 비교하므로 `new BigDecimal("1.5")`와 `new BigDecimal("1.50")`이 다른 값으로 판정됨. 값만 비교하려면 `compareTo() == 0`.
+- **연산 후 결과를 재할당**해야 함. `BigDecimal`은 immutable. `a.add(b)`는 a를 바꾸는 게 아니라 새 객체를 반환.
+- **`divide()`는 나누어떨어지지 않으면 `ArithmeticException`** 발생. `divide(divisor, scale, RoundingMode)` 형태로 명시해야 안전.
+
+### 교훈
+- 금액/점수/수량은 **무조건 BigDecimal**. 처음부터 그렇게 쓰는 습관이 중요.
+- 타입 선택이 잘못되면 나중에 어떤 트릭을 써도 근본적으로 해결되지 않음 (rating 0.5 단위 검증이 딱 이 사례).
+- DB 설계 단계에서 `DECIMAL`로 정했으면 Java 필드도 자동으로 `BigDecimal`이 되어야 자연스러움.
