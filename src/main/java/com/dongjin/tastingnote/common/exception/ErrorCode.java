@@ -23,11 +23,14 @@ public enum ErrorCode {
     NOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTE_NOT_FOUND", "존재하지 않는 노트입니다"),
     ALCOHOL_NOT_FOUND(HttpStatus.NOT_FOUND, "ALCOHOL_NOT_FOUND", "존재하지 않는 술입니다"),
     FLAVOR_NOT_FOUND(HttpStatus.NOT_FOUND, "FLAVOR_NOT_FOUND", "존재하지 않는 맛/향입니다"),
+    ALCOHOL_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "ALCOHOL_REQUEST_NOT_FOUND", "존재하지 않는 술 등록 요청입니다"),
 
     // 409 Conflict
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", "이미 사용 중인 이메일입니다"),
     NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다"),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "ALREADY_REPORTED", "이미 신고한 노트입니다"),
+    DUPLICATE_ALCOHOL_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_ALCOHOL_REQUEST", "이미 동일한 이름으로 등록 요청한 내역이 있습니다"),
+    ALREADY_PROCESSED(HttpStatus.CONFLICT, "ALREADY_PROCESSED", "이미 처리된 요청입니다"),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "서버 오류가 발생했습니다");
