@@ -1,6 +1,5 @@
 package com.dongjin.tastingnote.flavor.controller;
 
-import com.dongjin.tastingnote.common.response.ApiResponse;
 import com.dongjin.tastingnote.flavor.dto.FlavorSuggestionResponse;
 import com.dongjin.tastingnote.flavor.service.FlavorSuggestionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,7 +22,7 @@ public class FlavorSuggestionController {
 
     @Operation(summary = "맛/향 제안 목록 조회", description = "노트 작성 시 taste, aroma 입력에 사용할 제안 목록을 반환합니다.")
     @GetMapping
-    public ResponseEntity<ApiResponse<List<FlavorSuggestionResponse>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok(flavorSuggestionService.getAll()));
+    public ResponseEntity<List<FlavorSuggestionResponse>> getAll() {
+        return ResponseEntity.ok(flavorSuggestionService.getAll());
     }
 }

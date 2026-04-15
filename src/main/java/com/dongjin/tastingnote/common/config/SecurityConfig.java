@@ -37,6 +37,7 @@ public class SecurityConfig {
                                 "/api/flavors",
                                 "/api/alcohols/**",
                                 "/api/notes/public",
+                                "/api/feedbacks",
                                 "/swagger-ui/**",
                                 "/tastingnote.swagger",
                                 "/api-docs/**",

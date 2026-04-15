@@ -6,6 +6,7 @@ import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.flavor.entity.FlavorSuggestion;
 import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
+import com.dongjin.tastingnote.note.dto.NoteBaseRequest;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
@@ -66,23 +67,10 @@ public class NoteService {
         Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
 
-        Note note = Note.builder()
-                .user(user)
-                .alcohol(alcohol)
-                .title(request.getTitle())
-                .pairing(request.getPairing())
-                .rating(request.getRating())
-                .description(request.getDescription())
-                .isPublic(Boolean.TRUE.equals(request.getIsPublic()))
-                .drankAt(request.getDrankAt())
-                .location(request.getLocation())
-                .build();
-
+        Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
-        saveFlavors(note, request.getTasteIds(), request.getAromaIds());
 
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
-        return NoteResponse.from(note, flavors);
+        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds());
     }
 
     // 노트 단건 조회
@@ -99,39 +87,34 @@ public class NoteService {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
 
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
-        return NoteResponse.from(note, flavors);
+        return toResponse(note);
     }
 
     // 내 노트 전체 조회
     public List<NoteResponse> getMyNotes(Long userId) {
         return noteRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
+                .map(this::toResponse)
                 .toList();
     }
 
     // 내 노트 상태별 조회 (DRAFT or PUBLISHED)
     public List<NoteResponse> getMyNotesByStatus(Long userId, NoteStatus status) {
         return noteRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, status).stream()
-                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
+                .map(this::toResponse)
                 .toList();
     }
 
     // 공개 노트 전체 조회 (소셜 피드)
     public List<NoteResponse> getPublicNotes() {
         return noteRepository.findAllByIsPublicTrueAndStatusOrderByCreatedAtDesc(NoteStatus.PUBLISHED).stream()
-                .map(note -> NoteResponse.from(note, noteFlavorRepository.findAllByNoteId(note.getId())))
+                .map(this::toResponse)
                 .toList();
     }
 
     // 노트 수정
     @Transactional
     public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
-        if (!note.getUser().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
-        }
+        Note note = findNoteAndValidateOwner(noteId, userId);
         validateRating(request.getRating());
 
         Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
@@ -149,38 +132,64 @@ public class NoteService {
         );
 
         noteFlavorRepository.deleteAllByNoteId(noteId);
-        saveFlavors(note, request.getTasteIds(), request.getAromaIds());
 
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
-        return NoteResponse.from(note, flavors);
+        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds());
     }
 
     // 노트 발행
     @Transactional
     public NoteResponse publishNote(Long userId, Long noteId) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
-        if (!note.getUser().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
-        }
+        Note note = findNoteAndValidateOwner(noteId, userId);
         note.publish();
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(noteId);
-        return NoteResponse.from(note, flavors);
+        return toResponse(note);
     }
 
     // 노트 삭제
     @Transactional
     public void deleteNote(Long userId, Long noteId) {
-        Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
-        if (!note.getUser().getId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
-        }
+        Note note = findNoteAndValidateOwner(noteId, userId);
         reportRepository.deleteAllByNoteId(noteId);
         noteImageRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
         noteTagRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
+    }
+
+    // Note.builder() 공통 헬퍼
+    private Note buildNote(User user, Alcohol alcohol, NoteBaseRequest request) {
+        return Note.builder()
+                .user(user)
+                .alcohol(alcohol)
+                .title(request.getTitle())
+                .pairing(request.getPairing())
+                .rating(request.getRating())
+                .description(request.getDescription())
+                .isPublic(Boolean.TRUE.equals(request.getIsPublic()))
+                .drankAt(request.getDrankAt())
+                .location(request.getLocation())
+                .build();
+    }
+
+    // flavor 저장 후 응답 반환 공통 헬퍼 (create/update에서 사용)
+    private NoteResponse saveFlavorsThenResponse(Note note, List<Long> tasteIds, List<Long> aromaIds) {
+        saveFlavors(note, tasteIds, aromaIds);
+        return toResponse(note);
+    }
+
+    // flavor 조회 후 응답 반환 공통 헬퍼
+    private NoteResponse toResponse(Note note) {
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
+        return NoteResponse.from(note, flavors);
+    }
+
+    // 노트 조회 + 소유자 검증 공통 헬퍼
+    private Note findNoteAndValidateOwner(Long noteId, Long userId) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
+        if (!note.getUser().getId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
+        }
+        return note;
     }
 
     // FlavorSuggestion ID 목록으로 NoteFlavor 저장
