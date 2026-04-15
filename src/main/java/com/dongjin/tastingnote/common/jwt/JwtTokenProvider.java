@@ -2,6 +2,7 @@ package com.dongjin.tastingnote.common.jwt;
 
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
+import com.dongjin.tastingnote.user.entity.UserRole;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,13 +29,20 @@ public class JwtTokenProvider {
         this.refreshTokenExpiration = refreshTokenExpiration;
     }
 
-    public String generateAccessToken(Long userId) {
+    public String generateAccessToken(Long userId, UserRole role) {
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim("role", role.name())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                 .signWith(secretKey)
                 .compact();
+    }
+
+    public UserRole getUserRole(String token) {
+        String roleName = getClaims(token).get("role", String.class);
+        if (roleName == null) return UserRole.USER;
+        return UserRole.valueOf(roleName);
     }
 
     public String generateRefreshToken(Long userId) {

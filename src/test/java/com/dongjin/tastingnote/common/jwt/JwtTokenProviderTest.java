@@ -2,6 +2,7 @@ package com.dongjin.tastingnote.common.jwt;
 
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
+import com.dongjin.tastingnote.user.entity.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,21 +56,39 @@ class JwtTokenProviderTest {
         Long userId = 42L;
 
         // when
-        String token = tokenProvider.generateAccessToken(userId);
+        String token = tokenProvider.generateAccessToken(userId, UserRole.USER);
 
         // then
-        // assertThat: AssertJ 라이브러리의 검증 메서드.
-        // isEqualTo: 값이 같은지 확인.
         assertThat(tokenProvider.getUserId(token)).isEqualTo(userId);
+    }
+
+    @Test
+    @DisplayName("Access Token에 포함된 role을 getUserRole로 꺼낼 수 있다")
+    void generateAccessToken_withAdminRole_thenGetUserRoleReturnsAdmin() {
+        // given
+        String token = tokenProvider.generateAccessToken(1L, UserRole.ADMIN);
+
+        // when & then
+        assertThat(tokenProvider.getUserRole(token)).isEqualTo(UserRole.ADMIN);
+    }
+
+    @Test
+    @DisplayName("USER role로 발급한 토큰에서 getUserRole은 USER를 반환한다")
+    void generateAccessToken_withUserRole_thenGetUserRoleReturnsUser() {
+        // given
+        String token = tokenProvider.generateAccessToken(1L, UserRole.USER);
+
+        // when & then
+        assertThat(tokenProvider.getUserRole(token)).isEqualTo(UserRole.USER);
     }
 
     @Test
     @DisplayName("유효한 토큰은 validateToken이 true를 반환한다")
     void validateToken_withValidToken_returnsTrue() {
         // given
-        String token = tokenProvider.generateAccessToken(1L);
+        String token = tokenProvider.generateAccessToken(1L, UserRole.USER);
 
-        // when & then (한 줄로 합쳐도 됨)
+        // when & then
         assertThat(tokenProvider.validateToken(token)).isTrue();
     }
 
@@ -77,7 +96,7 @@ class JwtTokenProviderTest {
     @DisplayName("변조된 토큰은 validateToken이 false를 반환한다")
     void validateToken_withTamperedToken_returnsFalse() {
         // given: 정상 토큰을 생성한 뒤 뒤에 문자를 붙여서 위조
-        String validToken = tokenProvider.generateAccessToken(1L);
+        String validToken = tokenProvider.generateAccessToken(1L, UserRole.USER);
         String tamperedToken = validToken + "tampered";
 
         // when & then
