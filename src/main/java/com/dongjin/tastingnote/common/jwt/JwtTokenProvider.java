@@ -1,5 +1,7 @@
 package com.dongjin.tastingnote.common.jwt;
 
+import com.dongjin.tastingnote.common.exception.BusinessException;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +56,17 @@ public class JwtTokenProvider {
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
+        }
+    }
+
+    // RT 검증 전용: 만료 vs 위변조를 구분해서 적절한 에러 throw
+    public Long validateAndGetUserIdFromRefreshToken(String token) {
+        try {
+            return Long.parseLong(getClaims(token).getSubject());
+        } catch (ExpiredJwtException e) {
+            throw new BusinessException(ErrorCode.EXPIRED_TOKEN);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INVALID_TOKEN);
         }
     }
 

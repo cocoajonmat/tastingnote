@@ -43,6 +43,8 @@ jobs:
             echo 'DB_URL=${{ secrets.DB_URL }}' | sudo tee -a /etc/tastingnote.env > /dev/null
             echo 'DB_USERNAME=${{ secrets.DB_USERNAME }}' | sudo tee -a /etc/tastingnote.env > /dev/null
             echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' | sudo tee -a /etc/tastingnote.env > /dev/null
+            echo 'SLACK_ERROR_WEBHOOK_URL=${{ secrets.SLACK_ERROR_WEBHOOK_URL }}' | sudo tee -a /etc/tastingnote.env > /dev/null
+            echo 'SLACK_FEEDBACK_WEBHOOK_URL=${{ secrets.SLACK_FEEDBACK_WEBHOOK_URL }}' | sudo tee -a /etc/tastingnote.env > /dev/null
             sudo chmod 600 /etc/tastingnote.env
           "
 

@@ -9,4 +9,6 @@ jwt:
   secret: ${JWT_SECRET}
 
 notification:
-  slack-webhook-url: ${SLACK_WEBHOOK_URL:}
+  slack:
+    error-webhook-url: ${SLACK_ERROR_WEBHOOK_URL:}
+    feedback-webhook-url: ${SLACK_FEEDBACK_WEBHOOK_URL:}

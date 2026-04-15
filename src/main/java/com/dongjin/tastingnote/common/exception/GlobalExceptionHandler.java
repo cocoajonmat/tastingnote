@@ -1,6 +1,6 @@
 package com.dongjin.tastingnote.common.exception;
 
-import com.dongjin.tastingnote.common.notification.NotificationService;
+import com.dongjin.tastingnote.common.notification.NotificationPort;
 import com.dongjin.tastingnote.common.response.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -19,63 +19,70 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 @RequiredArgsConstructor
 public class GlobalExceptionHandler {
 
-    private final NotificationService notificationService;
+    private final NotificationPort notificationPort;
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException e, HttpServletRequest request) {
         ErrorCode errorCode = e.getErrorCode();
+        notificationPort.sendError(e, request, errorCode.getStatus());
         return ResponseEntity.status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e, HttpServletRequest request) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .findFirst()
                 .orElse("입력값이 올바르지 않습니다");
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(message));
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e) {
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException e, HttpServletRequest request) {
         String message = e.getConstraintViolations().stream()
                 .map(v -> v.getMessage())
                 .findFirst()
                 .orElse("입력값이 올바르지 않습니다");
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(message));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
         String message = e.getName() + "의 값이 올바르지 않습니다: " + e.getValue();
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(message));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadable(HttpMessageNotReadableException e, HttpServletRequest request) {
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of("요청 형식이 올바르지 않습니다"));
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e) {
+    public ResponseEntity<ErrorResponse> handleMissingParam(MissingServletRequestParameterException e, HttpServletRequest request) {
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(e.getParameterName() + " 파라미터가 필요합니다"));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e, HttpServletRequest request) {
+        notificationPort.sendError(e, request, HttpStatus.METHOD_NOT_ALLOWED);
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
                 .body(ErrorResponse.of("지원하지 않는 HTTP 메서드입니다"));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e, HttpServletRequest request) {
-        notificationService.sendSlackError(e, request.getRequestURI());
+        notificationPort.sendError(e, request, HttpStatus.INTERNAL_SERVER_ERROR);
         return ResponseEntity.status(ErrorCode.INTERNAL_SERVER_ERROR.getStatus())
                 .body(ErrorResponse.of(ErrorCode.INTERNAL_SERVER_ERROR));
     }

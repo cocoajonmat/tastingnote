@@ -49,7 +49,9 @@
 ## 5. 공통 / 인프라
 
 - [x]  공통 에러 처리 구조 (ErrorCode, BusinessException, ErrorResponse) ✅ 완료
-- [x]  500 에러 Slack 알림 (NotificationService) ✅ 완료
+- [x]  에러 Slack 알림 (4xx ⚠️ + 5xx 🚨 + 스택트레이스) ✅ 완료 (12회차 개선)
+- [x]  피드백/버그 신고 API (POST /api/feedbacks) ✅ 완료 (12회차 신설)
+- [x]  Slack 에러 채널 / 피드백 채널 분리 ✅ 완료 (12회차)
 - [x]  Swagger 문서화 ✅ 완료
 - [x]  GitHub Actions CI/CD ✅ 완료
 

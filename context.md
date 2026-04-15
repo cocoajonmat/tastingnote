@@ -139,10 +139,8 @@
 ## 패키지 구조
 com.dongjin.tastingnote
 ├── user/entity/User.java
-├── user/entity/RefreshToken.java
 ├── user/entity/Provider.java
 ├── user/repository/UserRepository.java
-├── user/repository/RefreshTokenRepository.java
 ├── user/service/UserService.java
 ├── user/controller/UserController.java
 ├── user/dto/SignUpRequest.java
@@ -167,6 +165,7 @@ com.dongjin.tastingnote
 ├── note/repository/NoteImageRepository.java
 ├── note/service/NoteService.java
 ├── note/controller/NoteController.java
+├── note/dto/NoteBaseRequest.java        ← 12회차 신설 (공통 추상 클래스)
 ├── note/dto/NoteCreateRequest.java
 ├── note/dto/NoteUpdateRequest.java
 ├── note/dto/NoteResponse.java
@@ -184,12 +183,24 @@ com.dongjin.tastingnote
 ├── report/service/ReportService.java
 ├── report/controller/ReportController.java
 ├── report/dto/ReportRequest.java
+├── feedback/entity/Feedback.java        ← 12회차 신설
+├── feedback/entity/FeedbackCategory.java
+├── feedback/entity/FeedbackStatus.java
+├── feedback/repository/FeedbackRepository.java
+├── feedback/service/FeedbackService.java
+├── feedback/controller/FeedbackController.java
+├── feedback/dto/FeedbackRequest.java
 ├── common/BaseEntity.java
-├── common/response/ApiResponse.java
+├── common/resolver/CurrentUserId.java              ← 12회차 신설
+├── common/resolver/CurrentUserIdArgumentResolver.java
+├── common/response/ErrorResponse.java
 ├── common/exception/GlobalExceptionHandler.java
+├── common/notification/NotificationPort.java       ← 12회차 신설 (인터페이스)
+├── common/notification/SlackNotificationService.java ← 12회차 rename (NotificationService → SlackNotificationService)
 ├── common/jwt/JwtTokenProvider.java
 ├── common/jwt/JwtAuthenticationFilter.java
 ├── common/config/SecurityConfig.java
+├── common/config/WebMvcConfig.java                 ← 12회차 신설
 └── common/config/SwaggerConfig.java
 
 ## 공통
@@ -371,6 +382,30 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
     - login/logout은 기존대로 deleteByUser 유지 (clean slate)
     - issueTokens 내부의 deleteByUser 호출 제거, 호출자가 명시적으로 정리 (책임 분리)
     - 이유: 기존에는 공격자가 탈취한 RT로 먼저 reissue하면 정상 유저의 재발급 요청이 조용히 실패할 뿐 탈취 탐지가 불가능했음. OAuth 2.0 Security BCP의 Refresh Token Rotation with Reuse Detection 패턴을 적용
+- refactor/12th-session-cleanup (2026-04-15) — 12회차 코드 품질 개선 + 피드백 인프라
+  - RT Stateless 전환: RefreshToken 엔티티/Repository 삭제, UserService DB 로직 제거
+    - 로그인 DB 3회 → 1회, 재발급 DB 2회 → 0회
+    - JwtTokenProvider.validateAndGetUserIdFromRefreshToken() 추가 (만료 vs 위변조 구분)
+    - Reuse Detection 제거됨 — 필요 시 추후 Redis 블랙리스트로 대체 예정
+  - @CurrentUserId ArgumentResolver 도입 — SecurityContextHolder 직접 접근 7곳 제거
+    - common/resolver/CurrentUserId.java + CurrentUserIdArgumentResolver.java 신설
+    - common/config/WebMvcConfig.java 신설
+  - ResponseEntity + ApiResponse 이중 래핑 제거 — ApiResponse.java 삭제
+    - 모든 컨트롤러 반환 타입 ResponseEntity<T>로 통일
+    - void 응답 → ResponseEntity.noContent().build() (204)
+  - NotificationPort 인터페이스 분리 — 외부 시스템 연결부 추상화
+    - NotificationService.java → SlackNotificationService implements NotificationPort
+    - GlobalExceptionHandler: NotificationPort 주입
+  - GlobalExceptionHandler: 4xx도 Slack 알림 전송
+    - 5xx: 🚨 + 스택트레이스(com.dongjin 패키지 최대 8줄)
+    - 4xx: ⚠️ + 메서드/URL/에러/메시지
+  - Slack 환경변수 분리: SLACK_WEBHOOK_URL → SLACK_ERROR_WEBHOOK_URL + SLACK_FEEDBACK_WEBHOOK_URL
+  - Feedback 엔티티/API 신설 — POST /api/feedbacks (로그인 불필요)
+    - FeedbackCategory: BUG / FEEDBACK / SUGGESTION
+    - FeedbackStatus: OPEN / IN_PROGRESS / RESOLVED
+    - 피드백 제출 시 SLACK_FEEDBACK_WEBHOOK_URL 채널로 즉시 알림
+  - NoteService.findNoteAndValidateOwner() 헬퍼 추출 (updateNote/publishNote/deleteNote)
+  - NoteBaseRequest 추상 클래스 신설 — NoteCreateRequest / NoteUpdateRequest 상속
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
@@ -421,13 +456,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
      - 101번 → 1번으로 줄어드는 것 로그로 확인
 7. NoteImage S3 업로드
 8. 소셜 로그인 (OAuth2)
-9. **RefreshToken 정리 스케줄러** (11회차에서 Reuse Detection 적용하며 발생)
-   - 11회차 fix에서 reissue 시 hard delete 대신 revoke 처리로 변경
-   - 탈취 감지(Reuse Detection)를 위해 revoked 토큰을 DB에 흔적으로 남겨둠
-   - 결과: 만료되거나 revoked된 토큰이 DB에 누적됨
-   - 해결: `@Scheduled`로 주기적(예: 하루 1회) cleanup 작업 필요
-     - `expires_at < now()` OR `revoked = true AND updated_at < now() - 7일` 삭제
-   - 참고: OAuth 2.0 Security BCP — Refresh Token Rotation with Reuse Detection
+9. ~~RefreshToken 정리 스케줄러~~ — 12회차에서 RT 자체를 Stateless(DB 저장 안 함)로 전환하면서 불필요해짐
 
 ---
 
