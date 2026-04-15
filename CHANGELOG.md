@@ -6,6 +6,37 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-15 — AlcoholRequest (술 등록 요청) 기능 구현
+
+### Added
+- `UserRole` 열거형 (`USER` / `ADMIN`) 신설
+- `User.role` 필드 추가 (`@Builder.Default = USER`, DB 컬럼 `role VARCHAR NOT NULL`)
+- `JwtTokenProvider`: `generateAccessToken(userId, role)` 시그니처 변경, `getUserRole(token)` 추가
+- `JwtAuthenticationFilter`: JWT에서 role 추출 → `ROLE_USER` / `ROLE_ADMIN` GrantedAuthority 설정
+- `SecurityConfig`: `.requestMatchers("/api/admin/**").hasRole("ADMIN")` 추가
+- `AlcoholRequestStatus` 열거형 (`PENDING` / `APPROVED` / `MERGED` / `REJECTED`)
+- `AlcoholRequest` 엔티티 (술 등록 요청, `@ElementCollection` aliases 포함)
+- `AlcoholRequestRepository`: `findAllByStatusOrderByCreatedAtDesc`, `existsByRequestedByAndNameIgnoreCase`
+- `AlcoholAliasRepository` 신설 (approve/merge 시 alias 저장)
+- `AlcoholRequestCreateRequest` DTO: name(필수), nameKo, aliases(max 10), reason(max 500), category(필수)
+- `AlcoholRequestResponse` DTO: 관리자용 `similarAlcohols` 포함
+- `AlcoholRequestService`: request / getRequests / approve / merge / reject
+- `AlcoholRequestController`: `POST /api/alcohol-requests` (로그인 필수)
+- `AdminAlcoholRequestController`: `GET|POST /api/admin/alcohol-requests/**` (ADMIN 전용)
+- ErrorCode 3개: `ALCOHOL_REQUEST_NOT_FOUND`(404), `DUPLICATE_ALCOHOL_REQUEST`(409), `ALREADY_PROCESSED`(409)
+
+### Changed
+- `UserService.issueTokens()`: `generateAccessToken(user.getId(), user.getRole())`로 role 전달
+
+### 결정 배경
+- Note의 `alcohol` 필드가 `nullable=false`로 변경된 이후 DB에 없는 술은 노트 작성 불가.
+  유저가 등록 요청 → 관리자가 Swagger에서 승인/병합/거절 처리하는 흐름으로 운영.
+- MERGED: 이미 DB에 있는 술과 사실상 같은 술일 때, 새 Alcohol을 만들지 않고 기존 Alcohol의 별칭으로 추가.
+  요청자가 알고 있는 이름(별칭)을 검색 DB에 추가하는 효과 → 검색 품질 향상.
+- 관리자 API는 초반에 어드민 페이지 없이 Swagger에서 직접 호출하는 방식으로 운영.
+
+---
+
 ## 2026-04-09 — Note 엔티티 alcoholName 자유입력 필드 제거
 
 **결정**: alcoholName String 필드 제거, alcohol @ManyToOne nullable=false로 변경 (엄격한 방식)

@@ -1838,4 +1838,89 @@ DB 컬럼이 `DECIMAL(2,1)`이면 Java 필드도 `BigDecimal`이어야 정밀도
 ### 교훈
 - 금액/점수/수량은 **무조건 BigDecimal**. 처음부터 그렇게 쓰는 습관이 중요.
 - 타입 선택이 잘못되면 나중에 어떤 트릭을 써도 근본적으로 해결되지 않음 (rating 0.5 단위 검증이 딱 이 사례).
+
+---
+
+## 역할 기반 접근 제어 (RBAC) — Spring Security hasRole (13회차)
+
+### 개념
+RBAC(Role-Based Access Control) — "이 API는 ADMIN만 쓸 수 있다"처럼 역할에 따라 접근을 제한하는 방식.
+
+### GrantedAuthority / SimpleGrantedAuthority
+Spring Security에서 "이 유저는 어떤 역할을 가지고 있다"를 표현하는 인터페이스와 구현체.
+
+```java
+// JwtAuthenticationFilter에서 role을 authority로 변환
+UserRole role = jwtTokenProvider.getUserRole(token);
+List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+
+// UsernamePasswordAuthenticationToken 3번째 인수가 authorities
+// 이전: Collections.emptyList() → authority 없음 (hasRole이 항상 false)
+// 이후: authorities 전달 → ROLE_USER / ROLE_ADMIN 구분 가능
+new UsernamePasswordAuthenticationToken(userId, null, authorities);
+```
+
+**`ROLE_` 접두사가 왜 필요한가?**
+`hasRole("ADMIN")` 메서드는 내부적으로 `ROLE_ADMIN`을 찾음. Spring Security 관례상 역할명에는 `ROLE_` 접두사가 붙어야 함. `hasAuthority("ADMIN")`은 접두사 없이 직접 매칭.
+
+### SecurityConfig에서 역할 제한
+```java
+.requestMatchers("/api/admin/**").hasRole("ADMIN")  // ROLE_ADMIN만 접근 가능
+// 이 설정이 없으면 authenticated()로만 걸러져서 USER도 /api/admin/** 호출 가능
+```
+
+### JWT에 role 클레임 추가
+```java
+// 발급 시
+Jwts.builder()
+    .claim("role", role.name())  // "USER" or "ADMIN"
+    ...
+
+// 추출 시
+String roleName = getClaims(token).get("role", String.class);
+UserRole.valueOf(roleName);
+```
+토큰 안에 role을 담아두면 매 요청마다 DB에서 유저 역할을 조회하지 않아도 됨. Stateless 방식의 핵심 이점.
+
+---
+
+## @ElementCollection — 단순 값 컬렉션을 별도 테이블로 관리
+
+### 개념
+엔티티가 아닌 단순 값(String, Integer 등)의 리스트를 DB에 저장할 때 사용.
+
+```java
+// AlcoholRequest.java
+@ElementCollection
+@CollectionTable(name = "alcohol_request_alias", joinColumns = @JoinColumn(name = "request_id"))
+@Column(name = "alias")
+@Builder.Default
+private List<String> aliases = new ArrayList<>();
+```
+
+### 생성되는 DB 구조
+```
+alcohol_request_alias 테이블
+- request_id (FK → alcohol_request.id)
+- alias (VARCHAR)
+```
+별칭 하나가 행 하나. AlcoholRequest 10개에 별칭 3개씩이면 30행.
+
+### `@ElementCollection` vs `@OneToMany`
+| | `@ElementCollection` | `@OneToMany` |
+|---|---|---|
+| 저장 대상 | 단순 값 (String 등) | 엔티티 객체 |
+| 독립 조회 | 불가 (부모 없이 못 씀) | 가능 |
+| 코드 복잡도 | 낮음 | 높음 |
+
+별칭처럼 "이 요청의 별칭" 이상의 의미가 없는 단순 값이면 `@ElementCollection`이 적합.
+
+### `@Builder.Default` 와 컬렉션
+Lombok `@Builder`는 기본값을 무시하고 null로 초기화하는 문제가 있음. 컬렉션 필드에 `@Builder.Default`를 붙여야 `new ArrayList<>()`가 적용됨.
+```java
+// 없으면: builder().build() → aliases = null → NullPointerException 위험
+// 있으면: builder().build() → aliases = [] (빈 리스트)
+@Builder.Default
+private List<String> aliases = new ArrayList<>();
+```
 - DB 설계 단계에서 `DECIMAL`로 정했으면 Java 필드도 자동으로 `BigDecimal`이 되어야 자연스러움.

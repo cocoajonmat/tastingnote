@@ -140,6 +140,7 @@
 com.dongjin.tastingnote
 ├── user/entity/User.java
 ├── user/entity/Provider.java
+├── user/entity/UserRole.java                    ← 13회차 신설
 ├── user/repository/UserRepository.java
 ├── user/service/UserService.java
 ├── user/controller/UserController.java
@@ -149,10 +150,19 @@ com.dongjin.tastingnote
 ├── alcohol/entity/Alcohol.java
 ├── alcohol/entity/AlcoholAlias.java
 ├── alcohol/entity/AlcoholCategory.java
+├── alcohol/entity/AlcoholRequest.java            ← 13회차 신설
+├── alcohol/entity/AlcoholRequestStatus.java      ← 13회차 신설
 ├── alcohol/repository/AlcoholRepository.java
+├── alcohol/repository/AlcoholAliasRepository.java ← 13회차 신설
+├── alcohol/repository/AlcoholRequestRepository.java ← 13회차 신설
 ├── alcohol/dto/AlcoholResponse.java
+├── alcohol/dto/AlcoholRequestCreateRequest.java  ← 13회차 신설
+├── alcohol/dto/AlcoholRequestResponse.java       ← 13회차 신설
 ├── alcohol/service/AlcoholService.java
+├── alcohol/service/AlcoholRequestService.java    ← 13회차 신설
 ├── alcohol/controller/AlcoholController.java
+├── alcohol/controller/AlcoholRequestController.java      ← 13회차 신설
+├── alcohol/controller/AdminAlcoholRequestController.java ← 13회차 신설
 ├── note/entity/Note.java
 ├── note/entity/NoteImage.java
 ├── note/entity/Like.java
@@ -223,7 +233,6 @@ com.dongjin.tastingnote
 
 | 기능 | 추가할 ErrorCode | HTTP |
 |------|----------------|------|
-| AlcoholRequest | `ALCOHOL_REQUEST_NOT_FOUND` | 404 |
 | Like | `ALREADY_LIKED` | 409 |
 | NoteImage (S3) | `IMAGE_UPLOAD_FAILED` | 500 |
 
