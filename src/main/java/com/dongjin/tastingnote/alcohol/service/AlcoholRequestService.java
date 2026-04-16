@@ -75,13 +75,7 @@ public class AlcoholRequestService {
                 .build();
         alcoholRepository.save(alcohol);
 
-        for (String alias : req.getAliases()) {
-            alcoholAliasRepository.save(AlcoholAlias.builder()
-                    .alcohol(alcohol)
-                    .alias(alias)
-                    .build());
-        }
-
+        saveAliases(alcohol, req);
         req.approve();
     }
 
@@ -92,14 +86,25 @@ public class AlcoholRequestService {
         Alcohol target = alcoholRepository.findById(alcoholId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
 
-        for (String alias : req.getAliases()) {
-            alcoholAliasRepository.save(AlcoholAlias.builder()
-                    .alcohol(target)
-                    .alias(alias)
-                    .build());
-        }
-
+        saveAliases(target, req);
         req.merge(target);
+    }
+
+    // name, nameKo, aliases 전부 alias로 저장 (중복 제외)
+    private void saveAliases(Alcohol alcohol, AlcoholRequest req) {
+        List<String> candidates = new java.util.ArrayList<>();
+        candidates.add(req.getName());
+        if (req.getNameKo() != null && !req.getNameKo().isBlank()) {
+            candidates.add(req.getNameKo());
+        }
+        candidates.addAll(req.getAliases());
+
+        candidates.stream()
+                .filter(a -> !alcoholAliasRepository.existsByAliasIgnoreCase(a))
+                .forEach(a -> alcoholAliasRepository.save(AlcoholAlias.builder()
+                        .alcohol(alcohol)
+                        .alias(a)
+                        .build()));
     }
 
     @Transactional
