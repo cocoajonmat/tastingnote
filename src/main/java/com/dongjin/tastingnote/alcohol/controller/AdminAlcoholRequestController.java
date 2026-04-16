@@ -4,6 +4,7 @@ import com.dongjin.tastingnote.alcohol.dto.AlcoholRequestResponse;
 import com.dongjin.tastingnote.alcohol.entity.AlcoholRequestStatus;
 import com.dongjin.tastingnote.alcohol.service.AlcoholRequestService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @Tag(name = "관리자 - 술 등록 요청", description = "술 등록 요청 관리자 API (ADMIN 전용)")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/admin/alcohol-requests")
 @RequiredArgsConstructor
