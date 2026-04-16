@@ -131,7 +131,6 @@ public class NoteService {
                 request.getLocation()
         );
 
-        noteRepository.save(note); // clearAutomatically=true로 인해 detach되기 전에 명시적으로 flush
         noteFlavorRepository.deleteAllByNoteId(noteId);
 
         return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds());

@@ -77,12 +77,27 @@ JPA는 DB에서 데이터를 읽으면 **메모리에 복사본(메모장)**을 
 
 ### 해결
 
-메모장이 초기화되기 **전에 먼저 DB에 저장**하면 된다.
+DELETE 실행 직전에 메모장 내용을 먼저 DB에 기록하면 된다.
+서비스 코드 대신 **Repository의 `@Modifying`에 `flushAutomatically = true`를 추가**하는 것이 실무적으로 올바른 방법.
 
 ```java
-noteRepository.save(note);                       // 먼저 DB에 씀 ✅
-noteFlavorRepository.deleteAllByNoteId(noteId);  // 그 다음 메모장 초기화 (이미 저장됐으니 OK)
+// NoteFlavorRepository
+@Modifying(clearAutomatically = true, flushAutomatically = true)
+@Query("DELETE FROM NoteFlavor nf WHERE nf.note.id = :noteId")
+void deleteAllByNoteId(@Param("noteId") Long noteId);
 ```
+
+DELETE 실행 직전에 메모장의 모든 pending 변경사항(note update 포함)을 먼저 DB에 씀.
+이후 `clearAutomatically = true`로 메모장이 초기화되어도 이미 기록된 상태라 문제없음.
+
+**왜 `noteRepository.save(note)`는 충분하지 않나**
+`save()`는 managed 엔티티에 대해 내부적으로 `em.merge()`를 호출하는데, 이건 즉시 DB 쓰기가 아님.
+실제 SQL은 여전히 나중(Hibernate가 필요하다고 판단할 때)으로 미뤄짐.
+→ 결국 clearAutomatically로 메모장이 날아가면 같은 문제 반복.
+
+**`saveAndFlush()`는?**
+즉시 flush를 강제해서 동작은 하지만, 서비스 레이어에 flush 책임이 생김.
+`flushAutomatically = true`는 Repository에서 flush 책임을 지는 방식이라 더 응집력 있고 실무에서도 권장됨.
 
 ---
 
