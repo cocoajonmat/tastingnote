@@ -415,6 +415,17 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
     - 피드백 제출 시 SLACK_FEEDBACK_WEBHOOK_URL 채널로 즉시 알림
   - NoteService.findNoteAndValidateOwner() 헬퍼 추출 (updateNote/publishNote/deleteNote)
   - NoteBaseRequest 추상 클래스 신설 — NoteCreateRequest / NoteUpdateRequest 상속
+- feature/alcohol-request → main PR 머지 완료 (PR #8, 2026-04-15) — 13회차
+  - UserRole(USER/ADMIN) 신설, JWT role 클레임, /api/admin/** ADMIN 전용 보호 (RBAC)
+  - AlcoholRequestStatus(PENDING/APPROVED/MERGED/REJECTED) 열거형
+  - AlcoholRequest 엔티티 (@ElementCollection aliases 포함)
+  - AlcoholRequestService: request / getRequests / approve / merge / reject
+  - AlcoholRequestController(유저), AdminAlcoholRequestController(관리자) 분리
+  - AccessDeniedHandler: USER가 관리자 API 접근 시 JSON 403 반환
+  - 승인/병합 시 name, nameKo도 AlcoholAlias에 자동 추가 (검색 품질 향상)
+  - 중복 요청 체크 alias 포함 강화, 거절 사유 필드 추가
+  - AlcoholRequest.aliases LazyInitializationException 수정 (FetchType.EAGER)
+  - Swagger 서버 URL 환경변수 관리 (SWAGGER_SERVER_URL, Mixed Content 해결)
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
@@ -425,7 +436,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
    - GET /api/alcohols?category= (카테고리별 목록)
    - GET /api/alcohols/{id} (단건 조회)
    - SecurityConfig에 /api/alcohols/**, /h2-console/** permitAll 추가
-3. **AlcoholRequest (크라우드소싱)** ← 다음 작업
+3. ~~AlcoholRequest (크라우드소싱)~~ ✅ 완료 (13회차, PR #8, 2026-04-15)
    - 술 데이터 품질이 서비스의 기반이므로 Tag/Like보다 우선
    - alcoholName 자유입력 제거로 DB에 없는 술은 반드시 AlcoholRequest를 거쳐야 함 (엄격한 방식 확정)
    - 초기 술 DB SQL 삽입(A안) + 크라우드소싱(B안) 조합으로 진행
@@ -445,7 +456,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
    - 초반 운영: 어드민 페이지 없이 Swagger에서 관리자 API 호출
    - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
    - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
-4. **술 상세 페이지 API** (AlcoholRequest 직후 확정, 2026-04-10)
+4. **술 상세 페이지 API** ← 다음 작업 (AlcoholRequest 직후 확정, 2026-04-10)
    - AlcoholRequest 완료 후 술 DB가 채워지기 시작해야 의미 있음
    - AlcoholController에 메서드 3개 추가:
      - `GET /api/alcohols/{id}/notes` — 해당 술의 공개 노트 목록

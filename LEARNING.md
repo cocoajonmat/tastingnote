@@ -1924,3 +1924,64 @@ Lombok `@Builder`는 기본값을 무시하고 null로 초기화하는 문제가
 private List<String> aliases = new ArrayList<>();
 ```
 - DB 설계 단계에서 `DECIMAL`로 정했으면 Java 필드도 자동으로 `BigDecimal`이 되어야 자연스러움.
+
+### @ElementCollection의 LazyInitializationException (13회차)
+`@ElementCollection`의 기본 fetch 타입은 **LAZY**. 엔티티를 조회한 트랜잭션이 닫힌 뒤에 컬렉션에 접근하면 예외 발생.
+
+```
+org.hibernate.LazyInitializationException: failed to lazily initialize a collection
+```
+
+**원인**: Service 메서드에 `@Transactional`이 있어도, 응답 직렬화(JSON 변환)는 트랜잭션 밖에서 발생함. DTO 변환 시 `aliases`를 참조하면 이미 세션이 닫혀 있음.
+
+**해결 방법 두 가지**:
+```java
+// A안: EAGER로 변경 (aliases가 항상 필요한 경우 — AlcoholRequest가 이 케이스)
+@ElementCollection(fetch = FetchType.EAGER)
+private List<String> aliases = new ArrayList<>();
+
+// B안: DTO 변환을 @Transactional 메서드 안에서 처리 (LAZY 유지)
+// — Service에서 aliases.stream().toList() 등 실제 접근을 트랜잭션 안에서 완료
+```
+
+`AlcoholRequest`에서는 응답마다 aliases가 필요하므로 A안(EAGER) 선택. aliases가 가끔만 필요하고 크기가 클 경우엔 B안이 더 효율적.
+
+---
+
+## AccessDeniedHandler — 권한 없는 접근 시 JSON 응답 (13회차)
+
+### 문제
+`SecurityConfig`에서 `.requestMatchers("/api/admin/**").hasRole("ADMIN")` 설정 후, USER 권한 유저가 `/api/admin/**`에 접근하면 Spring Security가 기본 동작으로 빈 403 응답을 반환.
+프론트 입장에서 빈 바디의 403은 파싱 불가 → 에러 처리 어려움.
+
+### 해결: AccessDeniedHandler 구현
+```java
+@Component
+public class CustomAccessDeniedHandler implements AccessDeniedHandler {
+    @Override
+    public void handle(HttpServletRequest request, HttpServletResponse response,
+                       AccessDeniedException ex) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        // ErrorResponse JSON 직접 작성
+        response.getWriter().write(...);
+    }
+}
+```
+
+`SecurityConfig`에 등록:
+```java
+.exceptionHandling(ex -> ex
+    .authenticationEntryPoint(customAuthenticationEntryPoint)  // 401: 미인증
+    .accessDeniedHandler(customAccessDeniedHandler)            // 403: 인증됐지만 권한 없음
+)
+```
+
+### AuthenticationEntryPoint vs AccessDeniedHandler 차이
+| | 언제 호출되나 | HTTP 상태 |
+|---|---|---|
+| `AuthenticationEntryPoint` | 토큰 없음 / 토큰 위변조 / 만료 | 401 Unauthorized |
+| `AccessDeniedHandler` | 토큰 있지만 역할(role)이 부족 | 403 Forbidden |
+
+USER 토큰으로 ADMIN API 접근 → 인증은 됐지만 권한 없음 → `AccessDeniedHandler` 호출.

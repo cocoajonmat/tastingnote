@@ -6,6 +6,26 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-16 — AlcoholRequest 개선 및 버그 수정 (13회차 후속)
+
+### Added
+- `AccessDeniedHandler` 신설 — USER 권한으로 `/api/admin/**` 접근 시 빈 응답 대신 JSON 403 반환
+- `AdminAlcoholRequestController.reject()`: `rejectReason` 필드 추가 (거절 사유 기록)
+- 승인(approve)/병합(merge) 시 요청된 `name`, `nameKo`도 `AlcoholAlias`에 자동 추가 (검색 품질 향상)
+
+### Changed
+- 중복 요청 체크 강화 — 기존 alias에 포함된 이름으로 재요청 시도도 중복으로 차단
+- Swagger 서버 URL을 환경변수 `SWAGGER_SERVER_URL`로 관리 (로컬/prod 분리, Mixed Content 해결)
+  - CI/CD GitHub Actions에서 `SWAGGER_SERVER_URL` 환경변수로 배포 시 덮어쓰기 방지
+
+### Fixed
+- `AlcoholRequest.aliases` `LazyInitializationException` 수정
+  - `@ElementCollection`의 기본 fetch 타입은 LAZY → 트랜잭션 밖 접근 시 세션 닫혀 예외 발생
+  - `@ElementCollection(fetch = FetchType.EAGER)`로 변경
+- Swagger `@SecurityRequirement` 누락 엔드포인트에 어노테이션 추가
+
+---
+
 ## 2026-04-15 — AlcoholRequest (술 등록 요청) 기능 구현
 
 ### Added
