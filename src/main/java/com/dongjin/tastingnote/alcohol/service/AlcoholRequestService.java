@@ -37,6 +37,9 @@ public class AlcoholRequestService {
         if (alcoholRepository.existsByNameIgnoreCase(req.getName())) {
             throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
         }
+        if (alcoholAliasRepository.existsByAliasIgnoreCase(req.getName())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+        }
 
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
