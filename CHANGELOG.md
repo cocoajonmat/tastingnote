@@ -6,6 +6,50 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-16 — 술 초기 데이터 삽입 + 테스트 수정 (15회차)
+
+### Added
+- `src/main/resources/data.sql` — 술 초기 데이터 170개 + AlcoholAlias 90개
+  - 위스키 64개 (블렌디드/스페이사이드/하이랜드/아일라/아메리칸/아이리시/재패니즈)
+  - 와인 32개 (레드/화이트/스파클링/로제)
+  - 맥주 27개 (수입 20 + 국산 7)
+  - 소주 10개 / 막걸리 10개 / 사케 10개 / 보드카 6개 / 진 6개 / 럼 6개 / 테킬라 6개 / 브랜디 6개
+  - AlcoholAlias: 조니워커 계열, 발렌타인, 맥캘란 등 주요 별칭 포함
+  - 로컬 H2: 앱 시작 시 자동 실행 / prod MySQL: SSH로 1회 실행
+  - Flyway 도입 시 `V2__seed_data.sql`로 이름만 바꾸면 그대로 활용 가능
+
+### Changed
+- `application.yaml`: `spring.jpa.defer-datasource-initialization: true` + `spring.sql.init.encoding: UTF-8` 추가
+  - defer: Hibernate DDL 이후 data.sql 실행 보장
+  - encoding: 한글 데이터 인코딩 오류 방지
+- `application-local.yaml`: `spring.sql.init.mode: always` 추가 (로컬 H2에서 data.sql 실행)
+- `AlcoholRequestServiceTest`: 테스트 3곳 수정
+  - `reject()` 인자 누락 수정 — 13회차에 `rejectReason` 파라미터 추가됐는데 테스트 미반영
+  - `approve_success` / `merge_success`: `saveAliases()`가 name+nameKo+alias 3개 저장하는데 `times(1)` 그대로 → `times(3)`으로 수정
+
+### Removed
+- `TastingnoteApplicationTests.java` — data.sql 한글 인코딩 문제로 contextLoads() 실패, 삭제
+
+---
+
+## 2026-04-16 — 출시 로드맵 확정 + 술 초기 데이터 전략 결정 (15회차)
+
+### 결정
+- **출시 전 작업 순서 확정**: 술 초기 데이터 삽입 → S3 이미지 업로드 → 소셜 로그인 → 출시
+  - Tag, Like, 술 상세 페이지 API는 출시 후에 구현
+- **술 초기 데이터 삽입 방법 확정**:
+  - `src/main/resources/data.sql` — 로컬 H2에서 앱 시작 시 자동 실행 (인메모리라 매번 fresh)
+  - prod MySQL은 SSH로 한 번만 직접 실행 (`mysql -u root -p tastingnote < data.sql`)
+  - 목표: 약 150~180개 메이저 술 + AlcoholAlias 포함
+  - 나중에 Flyway 도입 시 `V2__seed_data.sql`로 이름만 바꾸면 그대로 활용 가능
+- **Flyway 도입 시점 확정**: 소셜 로그인 완료 후 출시 직전
+  - 현재 `ddl-auto: update`는 개발 편의를 위해 유지
+  - 엔티티 변경이 끝나는 시점(소셜 로그인 완료)에 도입
+  - `ddl-auto: validate`로 전환 — 운영 DB 스키마 자동 변경 위험 차단
+  - `build.gradle` flyway 의존성 + `V1__init_schema.sql` + `V2__seed_data.sql` 정리 한 번에 진행
+
+---
+
 ## 2026-04-16 — 노트 수정 버그 수정 (14회차)
 
 ### Fixed

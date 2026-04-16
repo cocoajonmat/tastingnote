@@ -266,6 +266,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- 술 초기 데이터 삽입 (`data.sql`, 170개 술 + 90개 AlcoholAlias, 15회차)
 - 엔티티 전체 (User, Alcohol, AlcoholAlias, AlcoholCategory, Note, NoteImage, Like, Tag, NoteTag)
 - Note CRUD (NoteService, NoteController, DTO 3종)
 - JWT 인증 기반 구조 (JwtTokenProvider, JwtAuthenticationFilter)
@@ -456,27 +457,52 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
    - 초반 운영: 어드민 페이지 없이 Swagger에서 관리자 API 호출
    - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
    - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
-4. **술 상세 페이지 API** ← 다음 작업 (AlcoholRequest 직후 확정, 2026-04-10)
-   - AlcoholRequest 완료 후 술 DB가 채워지기 시작해야 의미 있음
-   - AlcoholController에 메서드 3개 추가:
-     - `GET /api/alcohols/{id}/notes` — 해당 술의 공개 노트 목록
-     - `GET /api/alcohols/{id}/stats` — 평균 별점 (노트 5개 이상 시 표시)
-     - `GET /api/alcohols/{id}/flavors` — 맛/향 분포 (NoteFlavor GROUP BY)
+---
+> **출시 로드맵 확정 (2026-04-16)**
+> 4번 → 5번 → 6번 → 출시. Tag/Like/술 상세 페이지는 출시 후.
+
+4. ~~**술 초기 데이터 삽입**~~ ✅ 완료 (15회차, 2026-04-16)
+   - 방법: `src/main/resources/data.sql` (로컬 H2 앱 시작 시 자동 실행) + prod는 SSH로 한 번 실행
+     ```bash
+     scp data.sql ubuntu@13.124.79.235:~/
+     mysql -u root -p tastingnote < data.sql
+     ```
+   - 목표 수량: 약 150~180개 + AlcoholAlias 포함
+     - 위스키 60~70개 (테이스팅 노트 앱 핵심 타겟)
+     - 와인 30~40개
+     - 맥주 25~30개
+     - 소주 10개 / 막걸리 10개 / 사케 10~15개
+     - 보드카/진/럼/테킬라/브랜디 각 5~8개
+   - 나중에 Flyway 도입 시 `data.sql` → `V2__seed_data.sql`로 이름만 바꾸면 됨
+
+5. **NoteImage S3 업로드** ← 다음 작업
+   - 구현 시 ErrorCode.IMAGE_UPLOAD_FAILED (500) 추가 필요
+   - 삭제 순서: Report → NoteImage → NoteFlavor → NoteTag → Note (NoteImage S3 파일도 함께 삭제)
+
+6. **소셜 로그인 (OAuth2)** → 완료 후 출시
+   - 카카오 / 구글 / 네이버
+
+7. **[출시 직전] Flyway 도입 + ddl-auto: validate 전환**
+   - 소셜 로그인까지 완료 후 엔티티가 안정된 시점에 진행
+   - `ddl-auto: update`는 운영 DB에서 위험 (오타 컬럼이 조용히 생기거나, 불필요한 컬럼 누적)
+   - 작업: build.gradle에 flyway 의존성 추가 + V1__init_schema.sql + V2__seed_data.sql 정리 + prod yaml 변경
+
+---
+> **출시 후 구현 예정**
+
+8. 술 상세 페이지 API (GET /api/alcohols/{id}/notes|stats|flavors)
    - 친구와 최종 확인 후 진행
-5. TagService / TagController
+
+9. TagService / TagController
    - **결정 필요**: Tag 엔티티에 `count` 필드가 있으나, context.md 확정 내용은 "NoteTag 개수 실시간 카운팅 방식 (Tag 테이블 컬럼 추가 없음)"
      - A안: count 컬럼 유지 — 추가/삭제 시 +1/-1, 조회 빠르지만 동기화 안 맞을 수 있음
      - B안: count 컬럼 삭제 — NoteTag COUNT 쿼리로 조회, 항상 정확하지만 약간 느림
-     - 지금 규모에서 둘 다 상관없음. Tag 작업 시작 전 결정 필요
-6. LikeService / LikeController
-   - **나중에 할 것**: Tag, Like, 피드 API 완성 후 N+1 문제 해결
-     - 로컬에서 노트 100개 테스트 데이터 삽입
-     - Spring Boot 로그에서 쿼리 수 직접 확인
-     - NoteRepository 목록 조회 메서드에 @EntityGraph 적용
-     - 101번 → 1번으로 줄어드는 것 로그로 확인
-7. NoteImage S3 업로드
-8. 소셜 로그인 (OAuth2)
-9. ~~RefreshToken 정리 스케줄러~~ — 12회차에서 RT 자체를 Stateless(DB 저장 안 함)로 전환하면서 불필요해짐
+
+10. LikeService / LikeController
+    - Like 구현 후 deleteNote()에 `likeRepository.deleteAllByNoteId(noteId)` 추가 필수
+    - Tag, Like, 피드 API 완성 후 N+1 문제 해결 (@EntityGraph 적용)
+
+11. ~~RefreshToken 정리 스케줄러~~ — 12회차에서 RT Stateless 전환으로 불필요해짐
 
 ---
 

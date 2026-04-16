@@ -142,8 +142,8 @@ class AlcoholRequestServiceTest {
         // then
         assertThat(req.getStatus()).isEqualTo(AlcoholRequestStatus.APPROVED);
         verify(alcoholRepository).save(any(Alcohol.class));
-        // aliases가 1개이므로 AlcoholAlias도 1번 저장
-        verify(alcoholAliasRepository, times(1)).save(any(AlcoholAlias.class));
+        // saveAliases: name("Buffalo Trace") + nameKo("버팔로 트레이스") + aliases(["버팔로"]) = 3번 저장
+        verify(alcoholAliasRepository, times(3)).save(any(AlcoholAlias.class));
     }
 
     @Test
@@ -190,7 +190,8 @@ class AlcoholRequestServiceTest {
         // then
         assertThat(req.getStatus()).isEqualTo(AlcoholRequestStatus.MERGED);
         assertThat(req.getMergedToAlcohol()).isEqualTo(existingAlcohol);
-        verify(alcoholAliasRepository, times(1)).save(any(AlcoholAlias.class));
+        // saveAliases: name("Buffalo Trace") + nameKo("버팔로 트레이스") + aliases(["버팔로"]) = 3번 저장
+        verify(alcoholAliasRepository, times(3)).save(any(AlcoholAlias.class));
     }
 
     @Test
@@ -224,7 +225,7 @@ class AlcoholRequestServiceTest {
         when(alcoholRequestRepository.findById(10L)).thenReturn(Optional.of(req));
 
         // when
-        alcoholRequestService.reject(10L);
+        alcoholRequestService.reject(10L, "중복 술입니다");
 
         // then
         assertThat(req.getStatus()).isEqualTo(AlcoholRequestStatus.REJECTED);
@@ -237,7 +238,7 @@ class AlcoholRequestServiceTest {
         when(alcoholRequestRepository.findById(999L)).thenReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> alcoholRequestService.reject(999L))
+        assertThatThrownBy(() -> alcoholRequestService.reject(999L, "사유"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.ALCOHOL_REQUEST_NOT_FOUND);
