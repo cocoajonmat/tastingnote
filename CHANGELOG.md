@@ -6,6 +6,17 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-16 — 노트 수정 버그 수정 (14회차)
+
+### Fixed
+- `NoteService.updateNote()`: 수정 내용이 DB에 반영되지 않는 버그 수정
+  - 원인: `noteFlavorRepository.deleteAllByNoteId()`가 `@Modifying(clearAutomatically=true)`로 선언되어 있어, 실행 후 영속성 컨텍스트(1차 캐시)가 초기화됨
+  - 이로 인해 `note.update()`로 변경한 엔티티가 detached 상태가 되어 트랜잭션 커밋 시 dirty checking 대상에서 제외 → DB에 쓰이지 않음
+  - PATCH 응답은 in-memory 객체 기준으로 반환되어 정상처럼 보이지만 실제 DB는 구버전 그대로
+  - 해결: `noteRepository.save(note)` 호출을 `deleteAllByNoteId()` 전에 명시적으로 추가하여 영속성 컨텍스트 초기화 전에 flush 보장
+
+---
+
 ## 2026-04-16 — AlcoholRequest 개선 및 버그 수정 (13회차 후속)
 
 ### Added
