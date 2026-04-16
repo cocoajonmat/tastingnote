@@ -30,7 +30,7 @@ public class AlcoholRequest extends BaseEntity {
     @Column(name = "name_ko")
     private String nameKo;
 
-    @ElementCollection
+    @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "alcohol_request_alias", joinColumns = @JoinColumn(name = "request_id"))
     @Column(name = "alias")
     @Builder.Default
