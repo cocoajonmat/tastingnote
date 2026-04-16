@@ -38,6 +38,9 @@ public class AlcoholRequest extends BaseEntity {
 
     private String reason;
 
+    @Column(name = "reject_reason")
+    private String rejectReason;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
@@ -60,7 +63,8 @@ public class AlcoholRequest extends BaseEntity {
         this.mergedToAlcohol = alcohol;
     }
 
-    public void reject() {
+    public void reject(String rejectReason) {
         this.status = AlcoholRequestStatus.REJECTED;
+        this.rejectReason = rejectReason;
     }
 }

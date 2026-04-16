@@ -20,4 +20,6 @@ public interface AlcoholRepository extends JpaRepository<Alcohol, Long> {
     List<Alcohol> searchByKeyword(@Param("keyword") String keyword);
 
     List<Alcohol> findAllByCategory(AlcoholCategory category);
+
+    boolean existsByNameIgnoreCase(String name);
 }

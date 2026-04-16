@@ -44,10 +44,12 @@ public class AdminAlcoholRequestController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "등록 요청 거절", description = "등록 요청을 거절합니다.")
+    @Operation(summary = "등록 요청 거절", description = "등록 요청을 거절합니다. rejectReason으로 거절 사유를 전달할 수 있습니다.")
     @PostMapping("/{id}/reject")
-    public ResponseEntity<Void> reject(@PathVariable Long id) {
-        alcoholRequestService.reject(id);
+    public ResponseEntity<Void> reject(
+            @PathVariable Long id,
+            @RequestParam(required = false) String rejectReason) {
+        alcoholRequestService.reject(id, rejectReason);
         return ResponseEntity.ok().build();
     }
 }

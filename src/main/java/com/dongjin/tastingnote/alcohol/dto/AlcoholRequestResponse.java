@@ -18,6 +18,7 @@ public class AlcoholRequestResponse {
     private String nameKo;
     private List<String> aliases;
     private String reason;
+    private String rejectReason;
     private AlcoholCategory category;
     private AlcoholRequestStatus status;
     private Long requestedById;
@@ -32,6 +33,7 @@ public class AlcoholRequestResponse {
                 .nameKo(request.getNameKo())
                 .aliases(request.getAliases())
                 .reason(request.getReason())
+                .rejectReason(request.getRejectReason())
                 .category(request.getCategory())
                 .status(request.getStatus())
                 .requestedById(request.getRequestedBy().getId())

@@ -34,6 +34,9 @@ public class AlcoholRequestService {
         if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, req.getName())) {
             throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
         }
+        if (alcoholRepository.existsByNameIgnoreCase(req.getName())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+        }
 
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
@@ -97,9 +100,9 @@ public class AlcoholRequestService {
     }
 
     @Transactional
-    public void reject(Long requestId) {
+    public void reject(Long requestId, String rejectReason) {
         AlcoholRequest req = findPendingRequest(requestId);
-        req.reject();
+        req.reject(rejectReason);
     }
 
     private AlcoholRequest findPendingRequest(Long requestId) {
