@@ -2,6 +2,9 @@ package com.dongjin.tastingnote.common.config;
 
 import com.dongjin.tastingnote.common.jwt.JwtAuthenticationFilter;
 import com.dongjin.tastingnote.common.jwt.JwtTokenProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.dongjin.tastingnote.common.exception.ErrorCode;
+import com.dongjin.tastingnote.common.response.ErrorResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
@@ -13,8 +16,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableWebSecurity
@@ -52,11 +57,24 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler())
                 )
                 .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider),
                         UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AccessDeniedHandler accessDeniedHandler() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return (request, response, ex) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(
+                    objectMapper.writeValueAsString(ErrorResponse.of(ErrorCode.FORBIDDEN_ACCESS))
+            );
+        };
     }
 
     @Bean
