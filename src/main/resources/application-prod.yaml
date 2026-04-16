@@ -12,3 +12,6 @@ notification:
   slack:
     error-webhook-url: ${SLACK_ERROR_WEBHOOK_URL:}
     feedback-webhook-url: ${SLACK_FEEDBACK_WEBHOOK_URL:}
+
+swagger:
+  server-url: ${SWAGGER_SERVER_URL:}
