@@ -32,7 +32,7 @@ public class AdminAlcoholRequestController {
     @PostMapping("/{id}/approve")
     public ResponseEntity<Void> approve(@PathVariable Long id) {
         alcoholRequestService.approve(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "등록 요청 병합", description = "요청된 술을 기존 Alcohol의 별칭으로 추가합니다.")
@@ -41,7 +41,7 @@ public class AdminAlcoholRequestController {
             @PathVariable Long id,
             @RequestParam Long alcoholId) {
         alcoholRequestService.merge(id, alcoholId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "등록 요청 거절", description = "등록 요청을 거절합니다. rejectReason으로 거절 사유를 전달할 수 있습니다.")
@@ -50,6 +50,6 @@ public class AdminAlcoholRequestController {
             @PathVariable Long id,
             @RequestParam(required = false) String rejectReason) {
         alcoholRequestService.reject(id, rejectReason);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

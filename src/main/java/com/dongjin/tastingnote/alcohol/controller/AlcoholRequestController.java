@@ -29,6 +29,6 @@ public class AlcoholRequestController {
             @CurrentUserId Long userId,
             @Valid @RequestBody AlcoholRequestCreateRequest request) {
         alcoholRequestService.request(userId, request);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 }

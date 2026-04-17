@@ -6,6 +6,20 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-17 — 공통 패턴 정리 (16회차)
+
+### Changed
+- `AlcoholRequestService.request()`: 중복 체크 3개(if 3연속) → `validateNoDuplicateName()` private 헬퍼로 추출
+  - NoteService의 `findNoteAndValidateOwner()` 패턴과 동일 — 반복되는 검증 로직을 한 곳에 모아 가독성 향상
+- `AlcoholRequestService.saveAliases()`: 스트림 내 개별 `save()` 루프 → `saveAll()` 벌크 저장으로 전환
+  - NoteService의 `saveAll()` 패턴과 동일 — DB 왕복 횟수 감소
+- `AlcoholRequestService`: `new java.util.ArrayList<>()` FQCN 방식 → `import java.util.ArrayList` 추가 후 간결하게 사용
+- `AlcoholRequestController.request()`: `ResponseEntity.ok().build()` → `ResponseEntity.noContent().build()` (200 → 204)
+- `AdminAlcoholRequestController.approve/merge/reject()`: 동일하게 200 → 204로 통일
+  - void 응답에 200을 쓰면 "바디가 있을 수도 있다"는 오해를 줄 수 있음. 결과물이 없는 뮤테이션은 204가 REST 관례
+
+---
+
 ## 2026-04-16 — 술 초기 데이터 삽입 + 테스트 수정 (15회차)
 
 ### Added

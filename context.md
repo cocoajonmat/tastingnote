@@ -267,6 +267,9 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 완료
 - 술 초기 데이터 삽입 (`data.sql`, 170개 술 + 90개 AlcoholAlias, 15회차)
+- 공통 패턴 정리 (refactor/common-pattern-cleanup, 16회차)
+  - AlcoholRequestService: `validateNoDuplicateName()` 헬퍼 추출, `saveAliases()` saveAll 전환
+  - AlcoholRequestController / AdminAlcoholRequestController: void 응답 200 → 204
 - 엔티티 전체 (User, Alcohol, AlcoholAlias, AlcoholCategory, Note, NoteImage, Like, Tag, NoteTag)
 - Note CRUD (NoteService, NoteController, DTO 3종)
 - JWT 인증 기반 구조 (JwtTokenProvider, JwtAuthenticationFilter)
