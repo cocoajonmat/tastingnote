@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -31,15 +33,7 @@ public class AlcoholRequestService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, req.getName())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
-        }
-        if (alcoholRepository.existsByNameIgnoreCase(req.getName())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
-        }
-        if (alcoholAliasRepository.existsByAliasIgnoreCase(req.getName())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
-        }
+        validateNoDuplicateName(user, req.getName());
 
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
@@ -92,19 +86,30 @@ public class AlcoholRequestService {
 
     // name, nameKo, aliases 전부 alias로 저장 (중복 제외)
     private void saveAliases(Alcohol alcohol, AlcoholRequest req) {
-        List<String> candidates = new java.util.ArrayList<>();
+        List<String> candidates = new ArrayList<>();
         candidates.add(req.getName());
         if (req.getNameKo() != null && !req.getNameKo().isBlank()) {
             candidates.add(req.getNameKo());
         }
         candidates.addAll(req.getAliases());
 
-        candidates.stream()
+        List<AlcoholAlias> toSave = candidates.stream()
                 .filter(a -> !alcoholAliasRepository.existsByAliasIgnoreCase(a))
-                .forEach(a -> alcoholAliasRepository.save(AlcoholAlias.builder()
+                .map(a -> AlcoholAlias.builder()
                         .alcohol(alcohol)
                         .alias(a)
-                        .build()));
+                        .build())
+                .toList();
+        alcoholAliasRepository.saveAll(toSave);
+    }
+
+    // 이름 중복 검증 헬퍼 (요청 이력 + 기존 술 + 별칭 통합 체크)
+    private void validateNoDuplicateName(User user, String name) {
+        if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, name)
+                || alcoholRepository.existsByNameIgnoreCase(name)
+                || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+        }
     }
 
     @Transactional
