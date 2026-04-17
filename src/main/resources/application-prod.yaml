@@ -8,6 +8,11 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+aws:
+  s3:
+    bucket: ${AWS_S3_BUCKET}
+    region: ${AWS_REGION:ap-northeast-2}
+
 notification:
   slack:
     error-webhook-url: ${SLACK_ERROR_WEBHOOK_URL:}
