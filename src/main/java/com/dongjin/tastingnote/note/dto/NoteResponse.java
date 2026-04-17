@@ -3,6 +3,7 @@ package com.dongjin.tastingnote.note.dto;
 import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
 import com.dongjin.tastingnote.note.entity.NoteFlavor;
+import com.dongjin.tastingnote.note.entity.NoteImage;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,6 +25,7 @@ public class NoteResponse {
     private String title;
     private List<FlavorItem> tastes;
     private List<FlavorItem> aromas;
+    private List<String> imageUrls;
     private String pairing;
     private BigDecimal rating;
     private String description;
@@ -41,7 +43,7 @@ public class NoteResponse {
         private String name;
     }
 
-    public static NoteResponse from(Note note, List<NoteFlavor> flavors) {
+    public static NoteResponse from(Note note, List<NoteFlavor> flavors, List<NoteImage> images) {
         List<FlavorItem> tastes = flavors.stream()
                 .filter(f -> f.getType() == FlavorType.TASTE)
                 .map(f -> FlavorItem.builder()
@@ -67,6 +69,7 @@ public class NoteResponse {
                 .title(note.getTitle())
                 .tastes(tastes)
                 .aromas(aromas)
+                .imageUrls(images.stream().map(NoteImage::getImageUrl).toList())
                 .pairing(note.getPairing())
                 .rating(note.getRating())
                 .description(note.getDescription())

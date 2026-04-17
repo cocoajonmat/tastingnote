@@ -6,7 +6,11 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface NoteImageRepository extends JpaRepository<NoteImage, Long> {
+
+    List<NoteImage> findAllByNoteId(Long noteId);
 
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM NoteImage ni WHERE ni.note.id = :noteId")

@@ -260,12 +260,21 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 | 9 | N+1 SELECT 쿼리 (의도적 보류) | getMyNotes/getPublicNotes에서 노트마다 alcohol/flavor를 개별 쿼리로 조회. 면접 스토리 목적으로 의도적으로 LAZY → @EntityGraph 전환 경험을 남겨둠. FEATURES.md 면접 스토리 #1 참고 |
 | 10 | deleteAllByNoteId 삭제 N+1 | ✅ 수정 완료 (10회차) — @Modifying(clearAutomatically=true) @Query 방식으로 전환 |
 | 11 | 목록 조회 정렬 기준 없음 | ✅ 수정 완료 (10회차) — OrderByCreatedAtDesc 추가 |
+| 12 | S3 분산 일관성 (보류) | S3 업로드/삭제와 DB는 원자적이지 않아 간헐적 고아 파일 발생 가능. 현재 허용. 추후 S3 Lifecycle 정책(미참조 파일 자동 삭제)으로 보완 예정 |
 
 ---
 
 ## 구현 현황
 
 ### 완료
+- 노트 이미지 S3 업로드/삭제 구현 (feature/note-image-s3, 17회차)
+  - S3Port 인터페이스 + S3Service 구현체 (upload/delete)
+  - NoteController createNote/updateNote multipart/form-data 전환
+  - 이미지 최대 3장, 파일당 5MB, 전체 15MB 제한
+  - 노트 수정 시 이미지 전달하면 전부 교체, 미전달 시 기존 유지
+  - 노트 삭제 시 S3 파일도 함께 삭제
+  - NoteResponse에 imageUrls 필드 추가
+  - AWS IAM 사용자 생성 + S3 버킷 설정 완료
 - 술 초기 데이터 삽입 (`data.sql`, 170개 술 + 90개 AlcoholAlias, 15회차)
 - 공통 패턴 정리 (refactor/common-pattern-cleanup, 16회차)
   - AlcoholRequestService: `validateNoDuplicateName()` 헬퍼 추출, `saveAliases()` saveAll 전환

@@ -4,6 +4,7 @@ import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
+import com.dongjin.tastingnote.common.s3.S3Port;
 import com.dongjin.tastingnote.flavor.entity.FlavorSuggestion;
 import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
 import com.dongjin.tastingnote.note.dto.NoteBaseRequest;
@@ -13,6 +14,7 @@ import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
 import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
 import com.dongjin.tastingnote.note.entity.NoteFlavor;
+import com.dongjin.tastingnote.note.entity.NoteImage;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
 import com.dongjin.tastingnote.note.repository.NoteImageRepository;
@@ -24,13 +26,17 @@ import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.LinkedHashSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -46,6 +52,7 @@ public class NoteService {
     private final FlavorSuggestionRepository flavorSuggestionRepository;
     private final ReportRepository reportRepository;
     private final NoteTagRepository noteTagRepository;
+    private final S3Port s3Port;
 
     // rating 0.5 단위 검증 (1.0, 1.5, 2.0 ... 5.0)
     private static final BigDecimal RATING_STEP = new BigDecimal("0.5");
@@ -58,7 +65,7 @@ public class NoteService {
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
-    public NoteResponse createNote(Long userId, NoteCreateRequest request) {
+    public NoteResponse createNote(Long userId, NoteCreateRequest request, List<MultipartFile> images) {
         validateRating(request.getRating());
 
         User user = userRepository.findById(userId)
@@ -70,7 +77,8 @@ public class NoteService {
         Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
 
-        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds());
+        List<NoteImage> savedImages = saveImages(note, images);
+        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds(), savedImages);
     }
 
     // 노트 단건 조회
@@ -113,7 +121,7 @@ public class NoteService {
 
     // 노트 수정
     @Transactional
-    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
+    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request, List<MultipartFile> images) {
         Note note = findNoteAndValidateOwner(noteId, userId);
         validateRating(request.getRating());
 
@@ -131,9 +139,21 @@ public class NoteService {
                 request.getLocation()
         );
 
+        // ⚠️ flavor 먼저: flushAutomatically=true → note.update() flush 후 context clear
         noteFlavorRepository.deleteAllByNoteId(noteId);
 
-        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds());
+        // 이미지 교체 (전달된 경우만)
+        List<NoteImage> savedImages;
+        if (images != null && !images.isEmpty()) {
+            List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId); // context clear 후 fresh 조회
+            deleteImagesFromS3(oldImages);
+            noteImageRepository.deleteAllByNoteId(noteId);
+            savedImages = saveImages(note, images);
+        } else {
+            savedImages = noteImageRepository.findAllByNoteId(noteId); // 기존 이미지 그대로
+        }
+
+        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds(), savedImages);
     }
 
     // 노트 발행
@@ -148,6 +168,8 @@ public class NoteService {
     @Transactional
     public void deleteNote(Long userId, Long noteId) {
         Note note = findNoteAndValidateOwner(noteId, userId);
+        List<NoteImage> images = noteImageRepository.findAllByNoteId(noteId); // URL 확보 먼저
+        deleteImagesFromS3(images);
         reportRepository.deleteAllByNoteId(noteId);
         noteImageRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
@@ -170,16 +192,23 @@ public class NoteService {
                 .build();
     }
 
-    // flavor 저장 후 응답 반환 공통 헬퍼 (create/update에서 사용)
-    private NoteResponse saveFlavorsThenResponse(Note note, List<Long> tasteIds, List<Long> aromaIds) {
+    // flavor 저장 후 응답 반환 공통 헬퍼 (이미지 리스트 보유 시)
+    private NoteResponse saveFlavorsThenResponse(Note note, List<Long> tasteIds, List<Long> aromaIds, List<NoteImage> images) {
         saveFlavors(note, tasteIds, aromaIds);
-        return toResponse(note);
+        return toResponse(note, images);
     }
 
-    // flavor 조회 후 응답 반환 공통 헬퍼
+    // 읽기용 응답 헬퍼 — findAllByNoteId 호출
     private NoteResponse toResponse(Note note) {
         List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
-        return NoteResponse.from(note, flavors);
+        List<NoteImage> images = noteImageRepository.findAllByNoteId(note.getId());
+        return NoteResponse.from(note, flavors, images);
+    }
+
+    // 쓰기 후 응답 헬퍼 — 이미지 리스트 재사용 (findAllByNoteId 생략)
+    private NoteResponse toResponse(Note note, List<NoteImage> images) {
+        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
+        return NoteResponse.from(note, flavors, images);
     }
 
     // 노트 조회 + 소유자 검증 공통 헬퍼
@@ -190,6 +219,40 @@ public class NoteService {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
         }
         return note;
+    }
+
+    // 이미지 S3 업로드 후 NoteImage 저장 — 저장된 리스트 반환 (DB 쿼리 절약)
+    private List<NoteImage> saveImages(Note note, List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) return List.of();
+        if (images.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
+
+        List<NoteImage> noteImages = new ArrayList<>();
+        for (MultipartFile file : images) {
+            if (file.isEmpty()) continue;
+            validateImageType(file);
+            String ext = Optional.ofNullable(StringUtils.getFilenameExtension(file.getOriginalFilename()))
+                    .orElse("jpg");
+            String key = "notes/" + note.getId() + "/" + UUID.randomUUID() + "." + ext;
+            String url = s3Port.upload(file, key);
+            noteImages.add(NoteImage.builder().note(note).imageUrl(url).build());
+        }
+        return noteImageRepository.saveAll(noteImages);
+    }
+
+    private void validateImageType(MultipartFile file) {
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_TYPE);
+        }
+    }
+
+    // S3에서 이미지 파일 삭제 헬퍼
+    private void deleteImagesFromS3(List<NoteImage> images) {
+        images.forEach(img -> {
+            String url = img.getImageUrl();
+            String key = url.substring(url.indexOf(".amazonaws.com/") + ".amazonaws.com/".length());
+            s3Port.delete(key);
+        });
     }
 
     // FlavorSuggestion ID 목록으로 NoteFlavor 저장

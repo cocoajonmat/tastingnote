@@ -6,6 +6,31 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-17 — 노트 이미지 S3 업로드 구현 (17회차)
+
+### Added
+- `common/s3/S3Port.java` — S3 외부 시스템 연결부 인터페이스 (Port 패턴, upload/delete)
+- `common/s3/S3Service.java` — S3Port 구현체 (AWS SDK v2, DefaultCredentialsProvider)
+- `common/config/S3Config.java` — S3Client Bean (region 환경변수 기반)
+- `NoteImageRepository.findAllByNoteId()` — 노트별 이미지 목록 조회 메서드
+- `NoteResponse.imageUrls` — 이미지 URL 목록 필드 추가
+- `ErrorCode` — IMAGE_UPLOAD_FAILED(500), IMAGE_LIMIT_EXCEEDED(400), INVALID_IMAGE_TYPE(400)
+- `build.gradle.kts` — AWS SDK v2 s3:2.25.70 의존성 추가
+- `application.yaml` — multipart 5MB/15MB 제한 + aws.s3 설정
+- `application-prod.yaml` — aws.s3 설정 추가
+- `application-local.yaml` — Slack 알림 설정 키 수정 (slack-webhook-url → slack.error-webhook-url)
+
+### Changed
+- `NoteController.createNote` — `@RequestBody` → `multipart/form-data` (`@RequestPart`)
+- `NoteController.updateNote` — 동일하게 multipart 전환, `@Encoding`으로 Swagger note 파트 Content-Type 명시
+- `NoteService.createNote/updateNote` — images 파라미터 추가, S3Port 주입, 이미지 헬퍼 추가
+- `NoteService.deleteNote` — 삭제 전 S3 파일 먼저 삭제 처리
+- `NoteService.toResponse()` — 오버로딩 추가 (이미지 리스트 재사용 버전으로 DB 쿼리 절약)
+- `GlobalExceptionHandler` — 500 에러 `log.error` 추가 (디버깅용)
+- `NoteResponse.from()` — 시그니처 변경 (`List<NoteImage>` 파라미터 추가)
+
+---
+
 ## 2026-04-17 — 공통 패턴 정리 (16회차)
 
 ### Changed
