@@ -16,10 +16,10 @@ public class Alcohol extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String name;
 
-    @Column(name = "name_ko")
+    @Column(name = "name_ko", unique = true)
     private String nameKo;
 
     @Enumerated(EnumType.STRING)
