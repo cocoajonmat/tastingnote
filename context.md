@@ -267,6 +267,9 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- 버그 수정 9건 (fix/17th-session-bugfix, 17회차)
+  - C1 테스트 오타, C2 updateNote 이미지 유실, C3 헤더 누락 500, C4 카테고리 substring 과잉매칭, C5 nameKo 중복 체크 누락
+  - H1 빈 파일 필터 순서, H2 다른 유저 PENDING 중복 허용, H3 S3 delete 예외 미처리, M1 중복 import
 - 노트 이미지 S3 업로드/삭제 구현 (feature/note-image-s3, 17회차)
   - S3Port 인터페이스 + S3Service 구현체 (upload/delete)
   - NoteController createNote/updateNote multipart/form-data 전환
@@ -470,6 +473,39 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
    - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
    - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
 ---
+> **AlcoholRequest 리팩터링 계획 (2026-04-19 확정)**
+> 브랜치: `feature/alcohol-request-v2` (다음 세션에서 시작)
+
+3-1. **AlcoholRequest 리팩터링** ← 다음 작업
+   - **배경**: 현재 구조는 name(영문 필수) + nameKo(선택)인데, 유저가 영어 명칭을 모를 수도 있고 한국어 명칭만 알 수도 있음. 불필요하게 까다로움.
+   - **변경 방향**: 신규 등록 / 별칭 추가를 같은 테이블(AlcoholRequest)에서 type으로 구분
+   
+   ### 엔티티 변경
+   - `AlcoholRequest`에 `type` 필드 추가: `NEW` / `ALIAS`
+   - `AlcoholRequest`에 `targetAlcohol` 필드 추가 (`@ManyToOne`, ALIAS 요청 시 대상 술)
+   - `name` 필드: 더 이상 영문 강제 아님 (영문 OR 한글 자유)
+   - `nameKo` 필드: 선택. name/nameKo 중 **하나 이상** 필수 (커스텀 유효성 검사 추가)
+   
+   ### 유저 API
+   - `POST /api/alcohol-requests` — 신규 술 등록 요청 (type=NEW)
+     - name OR nameKo 중 하나 이상 필수 (둘 다 입력 가능)
+     - aliases 선택 (신규 등록 시 별칭도 함께 요청 가능 — 기존 유지)
+     - reason, category 기존과 동일
+   - `POST /api/alcohol-requests/{alcoholId}/alias` — 기존 술에 별칭 추가 요청 (type=ALIAS)
+     - alias(별칭 하나 이상) + 선택적 reason
+     - 관리자 승인 필요 (이상한 별칭 방지)
+   
+   ### 관리자 API
+   - 기존: approve / merge / reject (신규 요청용)
+   - 추가: `POST /api/admin/alcohol-requests/{id}/approve-alias` — 별칭 요청 승인 (AlcoholAlias에 추가)
+   - `POST /api/admin/alcohol-requests/{id}/reject` — 신규/별칭 요청 모두 공용
+   - `GET /api/admin/alcohol-requests?status=PENDING&type=NEW|ALIAS` — type 필터 추가
+   
+   ### 중복 검증 정리
+   - nameKo null 허용으로 `existsByNameKoIgnoreCase(nameKo)` null 가드 추가 필요
+   - 기존 merge 엔드포인트 제거 가능 (별칭 추가 요청이 유저 주도 방식으로 대체)
+
+---
 > **출시 로드맵 확정 (2026-04-16)**
 > 4번 → 5번 → 6번 → 출시. Tag/Like/술 상세 페이지는 출시 후.
 
@@ -487,9 +523,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
      - 보드카/진/럼/테킬라/브랜디 각 5~8개
    - 나중에 Flyway 도입 시 `data.sql` → `V2__seed_data.sql`로 이름만 바꾸면 됨
 
-5. **NoteImage S3 업로드** ← 다음 작업
-   - 구현 시 ErrorCode.IMAGE_UPLOAD_FAILED (500) 추가 필요
-   - 삭제 순서: Report → NoteImage → NoteFlavor → NoteTag → Note (NoteImage S3 파일도 함께 삭제)
+5. ~~**NoteImage S3 업로드**~~ ✅ 완료 (17회차, 2026-04-17, PR #10)
 
 6. **소셜 로그인 (OAuth2)** → 완료 후 출시
    - 카카오 / 구글 / 네이버
