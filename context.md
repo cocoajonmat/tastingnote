@@ -267,13 +267,16 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
-- AlcoholRequest v2 리팩터링 (feature/alcohol-request-v2, 18회차)
+- AlcoholRequest v2 리팩터링 + 검증 강화 (feature/alcohol-request-v2, 18회차)
   - `AlcoholRequestType` enum 신설 (NEW / ALIAS)
-  - `AlcoholRequest` 엔티티: `type`(NOT NULL), `targetAlcohol` 추가; `name`, `category` nullable 변경
-  - 유저 API: `POST /api/alcohol-requests` (name OR nameKo 하나 이상 필수), `POST /api/alcohol-requests/{alcoholId}/alias` 신설
+  - `AlcoholRequest` 엔티티: `type`(NOT NULL), `targetAlcohol` 추가; `name`, `category` nullable 변경; `mergedToAlcohol`/`merge()` 제거
+  - `AlcoholRequestStatus.MERGED` 제거 → PENDING / APPROVED / REJECTED만 유지
+  - 유저 API: `POST /api/alcohol-requests` (name OR nameKo 하나 이상 필수), `POST /api/alcohol-requests/{alcoholId}/alias` 신설 (단일 `alias` 필드)
   - 관리자 API: `approve-alias` 추가, `merge` 제거, `GET` type 필터 추가
-  - `AlcoholAliasCreateRequest` DTO 신설
+  - `AlcoholAliasCreateRequest` DTO: `List<String> aliases` → `String alias` 단일 필드
   - `AlcoholRequestResponse`: type, targetAlcoholId, targetAlcoholName 추가
+  - ErrorCode `ALCOHOL_ALREADY_EXISTS` 추가 — DB 등록 vs PENDING 중복 에러 분리
+  - 검증 강화 7건: nameKo AlcoholRequest/AlcoholAlias 체크, name↔nameKo 크로스 필드 체크, ALIAS 요청 PENDING 중복 체크(JPQL), 공식명칭 별칭 요청 차단
   - prod DB 기존 레코드 처리: `UPDATE alcohol_request SET type = 'NEW' WHERE type IS NULL;` 필요
 - 버그 수정 9건 (fix/17th-session-bugfix, 17회차)
   - C1 테스트 오타, C2 updateNote 이미지 유실, C3 헤더 누락 500, C4 카테고리 substring 과잉매칭, C5 nameKo 중복 체크 누락
