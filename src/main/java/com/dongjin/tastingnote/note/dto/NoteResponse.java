@@ -18,6 +18,7 @@ public class NoteResponse {
     private Long id;
     private Long userId;
     private String nickname;
+    private String profileImageUrl;
     private Long alcoholId;
     private String alcoholName;
     private String alcoholNameKo;
@@ -41,6 +42,7 @@ public class NoteResponse {
                 .id(note.getId())
                 .userId(note.getUser().getId())
                 .nickname(note.getUser().getNickname())
+                .profileImageUrl(note.getUser().getProfileImageUrl())
                 .alcoholId(note.getAlcohol() != null ? note.getAlcohol().getId() : null)
                 .alcoholName(note.getAlcohol() != null ? note.getAlcohol().getName() : null)
                 .alcoholNameKo(note.getAlcohol() != null ? note.getAlcohol().getNameKo() : null)

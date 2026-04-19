@@ -20,7 +20,6 @@ public abstract class NoteBaseRequest {
     @Size(max = 100, message = "술 이름은 100자 이하여야 합니다")
     private String customAlcoholName;
 
-    @NotBlank(message = "제목은 필수입니다")
     @Size(max = 100, message = "제목은 100자 이하여야 합니다")
     private String title;
 

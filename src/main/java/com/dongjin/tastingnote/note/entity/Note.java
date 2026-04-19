@@ -32,7 +32,6 @@ public class Note extends BaseEntity {
     @Column(name = "custom_alcohol_name")
     private String customAlcoholName;
 
-    @Column(nullable = false)
     private String title;
 
     @Column(columnDefinition = "TEXT")
