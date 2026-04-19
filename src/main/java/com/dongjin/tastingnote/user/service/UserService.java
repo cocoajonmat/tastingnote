@@ -31,14 +31,14 @@ public class UserService {
         if (userRepository.existsByEmail(email)) {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
-        if (userRepository.existsByNicknameAndDeletedAtIsNull(request.nickname())) {
+        if (userRepository.existsByNicknameAndDeletedAtIsNull(request.getNickname())) {
             throw new BusinessException(ErrorCode.NICKNAME_ALREADY_EXISTS);
         }
 
         User user = User.builder()
                 .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
-                .nickname(request.nickname())
+                .nickname(request.getNickname())
                 .birthDate(request.getBirthDate())
                 .provider(Provider.LOCAL)
                 .build();
@@ -113,6 +113,11 @@ public class UserService {
     public ProfileImageResponse updateProfileImage(Long userId, MultipartFile file) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        long maxSize = 20 * 1024 * 1024; // 20MB
+        if (file.getSize() > maxSize) {
+            throw new BusinessException(ErrorCode.PROFILE_IMAGE_TOO_LARGE);
+        }
 
         // todo: S3 key를 DB에 별도 저장하도록 개선 필요 (현재는 URL에서 역추출)
         if (user.getProfileImageUrl() != null) {

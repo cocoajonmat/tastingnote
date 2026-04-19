@@ -42,7 +42,8 @@ public enum ErrorCode {
 
     // 400 Bad Request - Image
     IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "IMAGE_LIMIT_EXCEEDED", "이미지는 최대 3장까지 업로드할 수 있습니다"),
-    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_TYPE", "이미지 파일만 업로드할 수 있습니다");
+    INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_TYPE", "이미지 파일만 업로드할 수 있습니다"),
+    PROFILE_IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "PROFILE_IMAGE_TOO_LARGE", "프로필 이미지는 20MB 이하만 업로드할 수 있습니다");
 
     private final HttpStatus status;
     private final String code;
