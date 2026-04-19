@@ -56,7 +56,7 @@ public class NoteService {
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
-    public NoteResponse createNote(Long userId, NoteCreateRequest request, List<MultipartFile> images) {
+    public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         validateRating(request.getRating());
 
         User user = userRepository.findById(userId)
@@ -68,8 +68,7 @@ public class NoteService {
         Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
 
-        List<NoteImage> savedImages = saveImages(note, images);
-        return toResponse(note, savedImages);
+        return toResponse(note, List.of());
     }
 
     // 노트 단건 조회
@@ -112,7 +111,7 @@ public class NoteService {
 
     // 노트 수정
     @Transactional
-    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request, List<MultipartFile> images) {
+    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = findNoteAndValidateOwner(noteId, userId);
         validateRating(request.getRating());
 
@@ -132,19 +131,22 @@ public class NoteService {
                 request.getLocation()
         );
 
-        // 이미지 교체 (전달된 경우만)
-        List<NoteImage> savedImages;
-        if (images != null && !images.isEmpty()) {
-            List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
-            if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
-            List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId);
-            deleteImagesFromS3(oldImages);
-            noteImageRepository.deleteAllByNoteId(noteId);
-            savedImages = saveImages(note, images);
-        } else {
-            savedImages = noteImageRepository.findAllByNoteId(noteId);
-        }
+        return toResponse(note);
+    }
 
+    // 노트 이미지 교체
+    @Transactional
+    public NoteResponse updateImages(Long userId, Long noteId, List<MultipartFile> images) {
+        Note note = findNoteAndValidateOwner(noteId, userId);
+
+        List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
+        if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
+
+        List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId);
+        deleteImagesFromS3(oldImages);
+        noteImageRepository.deleteAllByNoteId(noteId);
+
+        List<NoteImage> savedImages = saveImages(note, nonEmpty);
         return toResponse(note, savedImages);
     }
 
