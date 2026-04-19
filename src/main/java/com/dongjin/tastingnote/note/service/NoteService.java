@@ -73,7 +73,7 @@ public class NoteService {
 
     // 노트 단건 조회
     public NoteResponse getNote(Long requesterId, Long noteId) {
-        Note note = noteRepository.findById(noteId)
+        Note note = noteRepository.findByIdWithAlcoholAndUser(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
 
         boolean isOwner = requesterId != null && note.getUser().getId().equals(requesterId);
@@ -217,7 +217,7 @@ public class NoteService {
 
     // 노트 조회 + 소유자 검증 공통 헬퍼
     private Note findNoteAndValidateOwner(Long noteId, Long userId) {
-        Note note = noteRepository.findById(noteId)
+        Note note = noteRepository.findByIdWithAlcoholAndUser(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
         if (!note.getUser().getId().equals(userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);
