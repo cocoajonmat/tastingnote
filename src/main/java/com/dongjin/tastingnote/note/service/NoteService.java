@@ -58,12 +58,12 @@ public class NoteService {
     @Transactional
     public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         validateRating(request.getRating());
+        validateAlcoholInput(request.getAlcoholId(), request.getCustomAlcoholName());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+        Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
 
         Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
@@ -114,12 +114,13 @@ public class NoteService {
     public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = findNoteAndValidateOwner(noteId, userId);
         validateRating(request.getRating());
+        validateAlcoholInput(request.getAlcoholId(), request.getCustomAlcoholName());
 
-        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+        Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
 
         note.update(
                 alcohol,
+                request.getCustomAlcoholName(),
                 request.getTitle(),
                 request.getTaste(),
                 request.getAroma(),
@@ -171,11 +172,26 @@ public class NoteService {
         noteRepository.delete(note);
     }
 
+    private void validateAlcoholInput(Long alcoholId, String customAlcoholName) {
+        boolean hasAlcoholId = alcoholId != null;
+        boolean hasCustomName = customAlcoholName != null && !customAlcoholName.isBlank();
+        if (!hasAlcoholId && !hasCustomName) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+    }
+
+    private Alcohol resolveAlcohol(Long alcoholId) {
+        if (alcoholId == null) return null;
+        return alcoholRepository.findById(alcoholId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+    }
+
     // Note.builder() 공통 헬퍼
     private Note buildNote(User user, Alcohol alcohol, NoteBaseRequest request) {
         return Note.builder()
                 .user(user)
                 .alcohol(alcohol)
+                .customAlcoholName(alcohol == null ? request.getCustomAlcoholName() : null)
                 .title(request.getTitle())
                 .taste(request.getTaste())
                 .aroma(request.getAroma())
