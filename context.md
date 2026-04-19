@@ -267,6 +267,12 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- prod DB 정비 + 초기 데이터 보완 (19회차, 2026-04-19)
+  - prod 테스트 데이터 전체 삭제 (alcohol 4개, 연관 노트/신고 포함)
+  - data.sql prod 적용 완료 (alcohol 186개 + alias 104개)
+  - 칵테일 15개 추가 (IBA 클래식 기준: Mojito, Negroni, Old Fashioned 등) — prod 직접 INSERT + data.sql 반영
+  - `Alcohol.name` / `nameKo` 컬럼 unique 제약 추가 (DB 정합성 보장)
+  - `deploy.yml`에 AWS S3 환경변수 추가 (`AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
 - AlcoholRequest v2 리팩터링 + 검증 강화 (feature/alcohol-request-v2, 18회차)
   - `AlcoholRequestType` enum 신설 (NEW / ALIAS)
   - `AlcoholRequest` 엔티티: `type`(NOT NULL), `targetAlcohol` 추가; `name`, `category` nullable 변경; `mergedToAlcohol`/`merge()` 제거
@@ -277,7 +283,6 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - `AlcoholRequestResponse`: type, targetAlcoholId, targetAlcoholName 추가
   - ErrorCode `ALCOHOL_ALREADY_EXISTS` 추가 — DB 등록 vs PENDING 중복 에러 분리
   - 검증 강화 7건: nameKo AlcoholRequest/AlcoholAlias 체크, name↔nameKo 크로스 필드 체크, ALIAS 요청 PENDING 중복 체크(JPQL), 공식명칭 별칭 요청 차단
-  - prod DB 기존 레코드 처리: `UPDATE alcohol_request SET type = 'NEW' WHERE type IS NULL;` 필요
 - 버그 수정 9건 (fix/17th-session-bugfix, 17회차)
   - C1 테스트 오타, C2 updateNote 이미지 유실, C3 헤더 누락 500, C4 카테고리 substring 과잉매칭, C5 nameKo 중복 체크 누락
   - H1 빈 파일 필터 순서, H2 다른 유저 PENDING 중복 허용, H3 S3 delete 예외 미처리, M1 중복 import
@@ -289,7 +294,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
   - 노트 삭제 시 S3 파일도 함께 삭제
   - NoteResponse에 imageUrls 필드 추가
   - AWS IAM 사용자 생성 + S3 버킷 설정 완료
-- 술 초기 데이터 삽입 (`data.sql`, 170개 술 + 90개 AlcoholAlias, 15회차)
+- 술 초기 데이터 삽입 (`data.sql`, 201개 술 + 104개 AlcoholAlias — 186개 기본 + 칵테일 15개, 15/19회차)
 - 공통 패턴 정리 (refactor/common-pattern-cleanup, 16회차)
   - AlcoholRequestService: `validateNoDuplicateName()` 헬퍼 추출, `saveAliases()` saveAll 전환
   - AlcoholRequestController / AdminAlcoholRequestController: void 응답 200 → 204

@@ -438,3 +438,23 @@ INSERT INTO alcohol_alias (alcohol_id, alias, created_at, updated_at) VALUES
 ((SELECT id FROM alcohol WHERE name = 'Dassai 23 Junmai Daiginjo'), '獺祭 23', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ((SELECT id FROM alcohol WHERE name = 'Dassai 39 Junmai Daiginjo'), '닷사이 39', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ((SELECT id FROM alcohol WHERE name = 'Dassai 45 Junmai Daiginjo'), '닷사이 45', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+-- --------------------------------------------------
+-- 칵테일 (COCKTAIL) - 15개
+-- --------------------------------------------------
+INSERT INTO alcohol (name, name_ko, category, origin, region, abv, created_at, updated_at) VALUES
+('Mojito', '모히토', 'COCKTAIL', 'Cuba', NULL, 13.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Margarita', '마르가리타', 'COCKTAIL', 'Mexico', NULL, 25.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Negroni', '네그로니', 'COCKTAIL', 'Italy', NULL, 24.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Old Fashioned', '올드 패션드', 'COCKTAIL', 'USA', NULL, 32.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Cosmopolitan', '코스모폴리탄', 'COCKTAIL', 'USA', NULL, 20.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Dry Martini', '드라이 마티니', 'COCKTAIL', 'USA', NULL, 30.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Daiquiri', '다이키리', 'COCKTAIL', 'Cuba', NULL, 20.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Whiskey Sour', '위스키 사워', 'COCKTAIL', 'USA', NULL, 25.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Manhattan', '맨해튼', 'COCKTAIL', 'USA', NULL, 30.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Tom Collins', '톰 콜린스', 'COCKTAIL', 'UK', NULL, 13.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Gimlet', '김렛', 'COCKTAIL', 'UK', NULL, 20.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Aperol Spritz', '아페롤 스프리츠', 'COCKTAIL', 'Italy', NULL, 11.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Pina Colada', '피나 콜라다', 'COCKTAIL', 'Puerto Rico', NULL, 13.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Long Island Iced Tea', '롱 아일랜드 아이스티', 'COCKTAIL', 'USA', NULL, 22.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('Bloody Mary', '블러디 메리', 'COCKTAIL', 'USA', NULL, 12.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
