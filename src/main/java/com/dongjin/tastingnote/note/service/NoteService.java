@@ -5,15 +5,11 @@ import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
 import com.dongjin.tastingnote.common.s3.S3Port;
-import com.dongjin.tastingnote.flavor.entity.FlavorSuggestion;
-import com.dongjin.tastingnote.flavor.repository.FlavorSuggestionRepository;
 import com.dongjin.tastingnote.note.dto.NoteBaseRequest;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
-import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
-import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteImage;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.repository.NoteFlavorRepository;
@@ -31,13 +27,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +41,6 @@ public class NoteService {
     private final NoteImageRepository noteImageRepository;
     private final UserRepository userRepository;
     private final AlcoholRepository alcoholRepository;
-    private final FlavorSuggestionRepository flavorSuggestionRepository;
     private final ReportRepository reportRepository;
     private final NoteTagRepository noteTagRepository;
     private final S3Port s3Port;
@@ -65,20 +56,19 @@ public class NoteService {
 
     // 노트 생성 (기본 임시저장 상태)
     @Transactional
-    public NoteResponse createNote(Long userId, NoteCreateRequest request, List<MultipartFile> images) {
+    public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         validateRating(request.getRating());
+        validateAlcoholInput(request.getAlcoholId(), request.getCustomAlcoholName());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+        Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
 
         Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
 
-        List<NoteImage> savedImages = saveImages(note, images);
-        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds(), savedImages);
+        return toResponse(note, List.of());
     }
 
     // 노트 단건 조회
@@ -121,16 +111,19 @@ public class NoteService {
 
     // 노트 수정
     @Transactional
-    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request, List<MultipartFile> images) {
+    public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = findNoteAndValidateOwner(noteId, userId);
         validateRating(request.getRating());
+        validateAlcoholInput(request.getAlcoholId(), request.getCustomAlcoholName());
 
-        Alcohol alcohol = alcoholRepository.findById(request.getAlcoholId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+        Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
 
         note.update(
                 alcohol,
+                request.getCustomAlcoholName(),
                 request.getTitle(),
+                request.getTaste(),
+                request.getAroma(),
                 request.getPairing(),
                 request.getRating(),
                 request.getDescription(),
@@ -139,23 +132,23 @@ public class NoteService {
                 request.getLocation()
         );
 
-        // ⚠️ flavor 먼저: flushAutomatically=true → note.update() flush 후 context clear
-        noteFlavorRepository.deleteAllByNoteId(noteId);
+        return toResponse(note);
+    }
 
-        // 이미지 교체 (전달된 경우만)
-        List<NoteImage> savedImages;
-        if (images != null && !images.isEmpty()) {
-            List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
-            if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
-            List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId); // context clear 후 fresh 조회
-            deleteImagesFromS3(oldImages);
-            noteImageRepository.deleteAllByNoteId(noteId);
-            savedImages = saveImages(note, images);
-        } else {
-            savedImages = noteImageRepository.findAllByNoteId(noteId); // 기존 이미지 그대로
-        }
+    // 노트 이미지 교체
+    @Transactional
+    public NoteResponse updateImages(Long userId, Long noteId, List<MultipartFile> images) {
+        Note note = findNoteAndValidateOwner(noteId, userId);
 
-        return saveFlavorsThenResponse(note, request.getTasteIds(), request.getAromaIds(), savedImages);
+        List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
+        if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
+
+        List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId);
+        deleteImagesFromS3(oldImages);
+        noteImageRepository.deleteAllByNoteId(noteId);
+
+        List<NoteImage> savedImages = saveImages(note, nonEmpty);
+        return toResponse(note, savedImages);
     }
 
     // 노트 발행
@@ -179,12 +172,29 @@ public class NoteService {
         noteRepository.delete(note);
     }
 
+    private void validateAlcoholInput(Long alcoholId, String customAlcoholName) {
+        boolean hasAlcoholId = alcoholId != null;
+        boolean hasCustomName = customAlcoholName != null && !customAlcoholName.isBlank();
+        if (!hasAlcoholId && !hasCustomName) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+    }
+
+    private Alcohol resolveAlcohol(Long alcoholId) {
+        if (alcoholId == null) return null;
+        return alcoholRepository.findById(alcoholId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+    }
+
     // Note.builder() 공통 헬퍼
     private Note buildNote(User user, Alcohol alcohol, NoteBaseRequest request) {
         return Note.builder()
                 .user(user)
                 .alcohol(alcohol)
+                .customAlcoholName(alcohol == null ? request.getCustomAlcoholName() : null)
                 .title(request.getTitle())
+                .taste(request.getTaste())
+                .aroma(request.getAroma())
                 .pairing(request.getPairing())
                 .rating(request.getRating())
                 .description(request.getDescription())
@@ -194,23 +204,15 @@ public class NoteService {
                 .build();
     }
 
-    // flavor 저장 후 응답 반환 공통 헬퍼 (이미지 리스트 보유 시)
-    private NoteResponse saveFlavorsThenResponse(Note note, List<Long> tasteIds, List<Long> aromaIds, List<NoteImage> images) {
-        saveFlavors(note, tasteIds, aromaIds);
-        return toResponse(note, images);
-    }
-
-    // 읽기용 응답 헬퍼 — findAllByNoteId 호출
+    // 읽기용 응답 헬퍼
     private NoteResponse toResponse(Note note) {
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
         List<NoteImage> images = noteImageRepository.findAllByNoteId(note.getId());
-        return NoteResponse.from(note, flavors, images);
+        return NoteResponse.from(note, images);
     }
 
-    // 쓰기 후 응답 헬퍼 — 이미지 리스트 재사용 (findAllByNoteId 생략)
+    // 쓰기 후 응답 헬퍼 — 이미지 리스트 재사용
     private NoteResponse toResponse(Note note, List<NoteImage> images) {
-        List<NoteFlavor> flavors = noteFlavorRepository.findAllByNoteId(note.getId());
-        return NoteResponse.from(note, flavors, images);
+        return NoteResponse.from(note, images);
     }
 
     // 노트 조회 + 소유자 검증 공통 헬퍼
@@ -258,47 +260,4 @@ public class NoteService {
         });
     }
 
-    // FlavorSuggestion ID 목록으로 NoteFlavor 저장
-    private void saveFlavors(Note note, List<Long> tasteIds, List<Long> aromaIds) {
-        List<Long> distinctTasteIds = tasteIds.stream().distinct().toList();
-        List<Long> distinctAromaIds = aromaIds.stream().distinct().toList();
-
-        // taste + aroma 전체 ID를 중복 없이 한 번에 조회
-        Set<Long> allIds = new LinkedHashSet<>();
-        allIds.addAll(distinctTasteIds);
-        allIds.addAll(distinctAromaIds);
-
-        if (allIds.isEmpty()) {
-            return;
-        }
-
-        List<FlavorSuggestion> found = flavorSuggestionRepository.findAllById(allIds);
-
-        // 존재하지 않는 ID가 하나라도 있으면 에러
-        if (found.size() != allIds.size()) {
-            throw new BusinessException(ErrorCode.FLAVOR_NOT_FOUND);
-        }
-
-        Map<Long, FlavorSuggestion> flavorMap = found.stream()
-                .collect(Collectors.toMap(FlavorSuggestion::getId, f -> f));
-
-        List<NoteFlavor> noteFlavors = new ArrayList<>();
-
-        for (Long flavorId : distinctTasteIds) {
-            noteFlavors.add(NoteFlavor.builder()
-                    .note(note)
-                    .flavor(flavorMap.get(flavorId))
-                    .type(FlavorType.TASTE)
-                    .build());
-        }
-        for (Long flavorId : distinctAromaIds) {
-            noteFlavors.add(NoteFlavor.builder()
-                    .note(note)
-                    .flavor(flavorMap.get(flavorId))
-                    .type(FlavorType.AROMA)
-                    .build());
-        }
-
-        noteFlavorRepository.saveAll(noteFlavors);
-    }
 }

@@ -7,10 +7,6 @@ import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import com.dongjin.tastingnote.note.service.NoteService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Encoding;
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -32,17 +28,13 @@ public class NoteController {
     private final NoteService noteService;
 
     @Operation(summary = "노트 생성", description = "새 노트를 생성합니다. 생성 시 항상 DRAFT(임시저장) 상태로 저장되며, 발행은 /publish 엔드포인트를 사용하세요.")
-    @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
-            encoding = @Encoding(name = "note", contentType = "application/json")))
     @SecurityRequirement(name = "bearerAuth")
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping
     public ResponseEntity<NoteResponse> createNote(
             @CurrentUserId Long userId,
-            @Parameter(content = @Content(mediaType = "application/json"))
-            @RequestPart("note") @Valid NoteCreateRequest request,
-            @RequestPart(value = "images", required = false) List<MultipartFile> images
+            @RequestBody @Valid NoteCreateRequest request
     ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(noteService.createNote(userId, request, images));
+        return ResponseEntity.status(HttpStatus.CREATED).body(noteService.createNote(userId, request));
     }
 
     @Operation(summary = "노트 단건 조회", description = "noteId로 특정 노트를 조회합니다. 공개 노트는 비로그인도 조회 가능하며, 비공개/임시저장 노트는 본인만 조회 가능합니다.")
@@ -74,18 +66,25 @@ public class NoteController {
     }
 
     @Operation(summary = "노트 수정", description = "노트 내용을 수정합니다. 본인의 노트만 수정 가능합니다.")
-    @RequestBody(content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
-            encoding = @Encoding(name = "note", contentType = "application/json")))
     @SecurityRequirement(name = "bearerAuth")
-    @PatchMapping(value = "/{noteId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PatchMapping("/{noteId}")
     public ResponseEntity<NoteResponse> updateNote(
             @CurrentUserId Long userId,
             @PathVariable Long noteId,
-            @Parameter(content = @Content(mediaType = "application/json"))
-            @RequestPart("note") @Valid NoteUpdateRequest request,
-            @RequestPart(value = "images", required = false) List<MultipartFile> images
+            @RequestBody @Valid NoteUpdateRequest request
     ) {
-        return ResponseEntity.ok(noteService.updateNote(userId, noteId, request, images));
+        return ResponseEntity.ok(noteService.updateNote(userId, noteId, request));
+    }
+
+    @Operation(summary = "노트 이미지 교체", description = "노트 이미지를 전부 교체합니다. 기존 이미지는 삭제되고 새 이미지로 대체됩니다. 최대 3장.")
+    @SecurityRequirement(name = "bearerAuth")
+    @PutMapping(value = "/{noteId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<NoteResponse> updateImages(
+            @CurrentUserId Long userId,
+            @PathVariable Long noteId,
+            @RequestPart("images") List<MultipartFile> images
+    ) {
+        return ResponseEntity.ok(noteService.updateImages(userId, noteId, images));
     }
 
     @Operation(summary = "노트 발행", description = "DRAFT 상태의 노트를 PUBLISHED 상태로 변경합니다. 본인의 노트만 발행 가능합니다.")

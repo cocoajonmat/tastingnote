@@ -54,13 +54,17 @@
     - Discovery 기능(Q3)과도 연결됨
 
 ### Note
-- alcohol 필드 (@ManyToOne, nullable = false) → DB에 있는 술 필수 선택
-- alcoholName 자유입력 제거 — 엄격한 방식으로 변경 확정 (2026-04-09)
-  - 이유: 자유입력 허용 시 같은 술이 "조니워커", "JW Black" 등으로 제각각 저장돼 Discovery/통계/술 상세 페이지 기능 불가
-  - DB에 없는 술은 AlcoholRequest로 등록 요청 → 승인 후 노트 작성
+- alcohol 필드 (@ManyToOne, nullable) — alcoholId 또는 customAlcoholName 중 하나 필수 (21회차, 2026-04-19)
+- customAlcoholName 필드 추가 (String, nullable) — DB에 없는 술을 자유 텍스트로 노트 작성 허용
+  - alcohol이 있으면 customAlcoholName은 null로 강제. alcohol이 null이면 customAlcoholName 저장
+  - AlcoholRequest 없이도 바로 노트 작성 가능 (UX 개선)
+  - Discovery/통계/술 상세는 alcohol이 연결된 노트에만 적용 (customAlcoholName 노트 제외)
+- ~~alcoholName 자유입력 제거 — 엄격한 방식으로 변경 확정 (2026-04-09)~~ → 21회차에 customAlcoholName으로 재도입
 - title → 필수
 - rating → 필수, 5점 만점 (0.5~5.0, 0.5단위) — DECIMAL(2,1), Java 타입 BigDecimal (11회차에 Double → BigDecimal 전환)
-- taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
+- taste, aroma → **출시 전 자유 텍스트로 임시 전환 (20회차, 2026-04-19)** — Note 엔티티에 String 필드로 저장
+  - 이유: 출시 일정으로 인해 임시 자유텍스트 방식 채택. NoteFlavor 중간 테이블/FlavorSuggestion은 코드에 유지
+  - **출시 후 Vivino 방식으로 재전환 예정** — FlavorSuggestion 선택 목록 + NoteFlavor 중간 테이블
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
 - drankAt → 선택
@@ -267,6 +271,11 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- customAlcoholName 자유 텍스트 지원 (21회차, 2026-04-19)
+  - Note.alcohol nullable 전환 + `custom_alcohol_name` 컬럼 추가
+  - NoteBaseRequest: alcoholId optional, customAlcoholName(@Size max=100) 필드 추가
+  - NoteService: `validateAlcoholInput()` (둘 다 없으면 INVALID_INPUT 400), `resolveAlcohol()` 추가
+  - NoteResponse: alcohol null 처리, customAlcoholName 반환
 - prod DB 정비 + 초기 데이터 보완 (19회차, 2026-04-19)
   - prod 테스트 데이터 전체 삭제 (alcohol 4개, 연관 노트/신고 포함)
   - data.sql prod 적용 완료 (alcohol 186개 + alias 104개)

@@ -26,11 +26,20 @@ public class Note extends BaseEntity {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "alcohol_id", nullable = false)
+    @JoinColumn(name = "alcohol_id")
     private Alcohol alcohol;
+
+    @Column(name = "custom_alcohol_name")
+    private String customAlcoholName;
 
     @Column(nullable = false)
     private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String taste;
+
+    @Column(columnDefinition = "TEXT")
+    private String aroma;
 
     @Column(columnDefinition = "TEXT")
     private String pairing;
@@ -56,10 +65,13 @@ public class Note extends BaseEntity {
     private String location;
 
     // 노트 내용 수정
-    public void update(Alcohol alcohol, String title, String pairing, BigDecimal rating, String description,
-                       Boolean isPublic, LocalDate drankAt, String location) {
+    public void update(Alcohol alcohol, String customAlcoholName, String title, String taste, String aroma, String pairing,
+                       BigDecimal rating, String description, Boolean isPublic, LocalDate drankAt, String location) {
         this.alcohol = alcohol;
+        this.customAlcoholName = alcohol == null ? customAlcoholName : null;
         this.title = title;
+        this.taste = taste;
+        this.aroma = aroma;
         this.pairing = pairing;
         this.rating = rating;
         this.description = description;

@@ -22,7 +22,8 @@
 
 - [x]  [필수] 노트 CRUD (작성 / 조회 / 수정 / 삭제) ✅ 백엔드 완료
 - [x]  [필수] 술 이름 자동완성 ✅ 백엔드 완료 (GET /api/alcohols/search)
-- [x]  [필수] 맛/향 선택 (Vivino 방식, NoteFlavor 중간 테이블) ✅ 백엔드 완료
+- [x]  [UX] DB 미등록 술 자유 텍스트 입력 (customAlcoholName) ✅ 백엔드 완료 (21회차 — alcohol null + custom_alcohol_name 컬럼)
+- [x]  [필수] 맛/향 선택 (Vivino 방식, NoteFlavor 중간 테이블) ✅ 백엔드 완료 → **출시 직전 자유 텍스트로 임시 전환 (20회차)**
 - [ ]  [필수] 태그 자동완성
 - [ ]  [필수] 공개 / 비공개 설정
 - [x]  [UX] 사진 업로드 (S3) ✅ 백엔드 완료 (17회차 — 최대 3장, multipart/form-data)
