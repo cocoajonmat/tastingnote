@@ -30,6 +30,7 @@ public enum ErrorCode {
     NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다"),
     ALREADY_REPORTED(HttpStatus.CONFLICT, "ALREADY_REPORTED", "이미 신고한 노트입니다"),
     DUPLICATE_ALCOHOL_REQUEST(HttpStatus.CONFLICT, "DUPLICATE_ALCOHOL_REQUEST", "이미 동일한 이름으로 등록 요청한 내역이 있습니다"),
+    ALCOHOL_ALREADY_EXISTS(HttpStatus.CONFLICT, "ALCOHOL_ALREADY_EXISTS", "이미 등록된 술 또는 별칭입니다"),
     ALREADY_PROCESSED(HttpStatus.CONFLICT, "ALREADY_PROCESSED", "이미 처리된 요청입니다"),
 
     // 500 Internal Server Error

@@ -56,17 +56,8 @@ public class AlcoholRequest extends BaseEntity {
     @Enumerated(EnumType.STRING)
     private AlcoholCategory category;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "merged_to_alcohol_id")
-    private Alcohol mergedToAlcohol;
-
     public void approve() {
         this.status = AlcoholRequestStatus.APPROVED;
-    }
-
-    public void merge(Alcohol alcohol) {
-        this.status = AlcoholRequestStatus.MERGED;
-        this.mergedToAlcohol = alcohol;
     }
 
     public void reject(String rejectReason) {

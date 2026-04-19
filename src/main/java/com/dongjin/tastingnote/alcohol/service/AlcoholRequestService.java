@@ -60,11 +60,26 @@ public class AlcoholRequestService {
         Alcohol target = alcoholRepository.findById(alcoholId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
 
+        String alias = req.getAlias();
+        if (alcoholAliasRepository.existsByAliasIgnoreCase(alias)
+                || alcoholRepository.existsByNameIgnoreCase(alias)
+                || alcoholRepository.existsByNameKoIgnoreCase(alias)) {
+            throw new BusinessException(ErrorCode.ALCOHOL_ALREADY_EXISTS);
+        }
+
+        if (alcoholRequestRepository.existsByAliasIgnoreCaseAndStatus(alias, AlcoholRequestStatus.PENDING)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+        }
+
+        if (alcoholRequestRepository.existsByRequestedByAndTargetAlcoholIdAndStatus(user, alcoholId, AlcoholRequestStatus.PENDING)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+        }
+
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
                 .type(AlcoholRequestType.ALIAS)
                 .targetAlcohol(target)
-                .aliases(req.getAliases())
+                .aliases(List.of(alias))
                 .reason(req.getReason())
                 .build();
 
@@ -108,11 +123,10 @@ public class AlcoholRequestService {
         AlcoholRequest req = findPendingRequestOfType(requestId, AlcoholRequestType.ALIAS);
         Alcohol target = req.getTargetAlcohol();
 
-        List<AlcoholAlias> toSave = req.getAliases().stream()
-                .filter(a -> !alcoholAliasRepository.existsByAliasIgnoreCase(a))
-                .map(a -> AlcoholAlias.builder().alcohol(target).alias(a).build())
-                .toList();
-        alcoholAliasRepository.saveAll(toSave);
+        String alias = req.getAliases().get(0);
+        if (!alcoholAliasRepository.existsByAliasIgnoreCase(alias)) {
+            alcoholAliasRepository.save(AlcoholAlias.builder().alcohol(target).alias(alias).build());
+        }
         req.approve();
     }
 
@@ -137,15 +151,26 @@ public class AlcoholRequestService {
 
     private void validateNoDuplicateName(User user, String name, String nameKo) {
         if (!isBlank(name)) {
+            if (alcoholRepository.existsByNameIgnoreCase(name)
+                    || alcoholRepository.existsByNameKoIgnoreCase(name)
+                    || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
+                throw new BusinessException(ErrorCode.ALCOHOL_ALREADY_EXISTS);
+            }
             if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, name)
                     || alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(name, AlcoholRequestStatus.PENDING)
-                    || alcoholRepository.existsByNameIgnoreCase(name)
-                    || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
+                    || alcoholRequestRepository.existsByNameKoIgnoreCaseAndStatus(name, AlcoholRequestStatus.PENDING)) {
                 throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
             }
         }
         if (!isBlank(nameKo)) {
-            if (alcoholRepository.existsByNameKoIgnoreCase(nameKo)) {
+            if (alcoholRepository.existsByNameKoIgnoreCase(nameKo)
+                    || alcoholRepository.existsByNameIgnoreCase(nameKo)
+                    || alcoholAliasRepository.existsByAliasIgnoreCase(nameKo)) {
+                throw new BusinessException(ErrorCode.ALCOHOL_ALREADY_EXISTS);
+            }
+            if (alcoholRequestRepository.existsByRequestedByAndNameKoIgnoreCase(user, nameKo)
+                    || alcoholRequestRepository.existsByNameKoIgnoreCaseAndStatus(nameKo, AlcoholRequestStatus.PENDING)
+                    || alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(nameKo, AlcoholRequestStatus.PENDING)) {
                 throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
             }
         }
