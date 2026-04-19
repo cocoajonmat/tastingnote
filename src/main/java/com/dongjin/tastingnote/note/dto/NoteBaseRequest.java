@@ -10,8 +10,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 @Getter
 @NoArgsConstructor
@@ -24,11 +22,9 @@ public abstract class NoteBaseRequest {
     @Size(max = 100, message = "제목은 100자 이하여야 합니다")
     private String title;
 
-    @NotNull(message = "tasteIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
-    private List<Long> tasteIds = new ArrayList<>();
+    private String taste;
 
-    @NotNull(message = "aromaIds는 null일 수 없습니다. 선택하지 않으려면 빈 배열([])을 보내주세요")
-    private List<Long> aromaIds = new ArrayList<>();
+    private String aroma;
 
     private String pairing;
 

@@ -60,7 +60,9 @@
   - DB에 없는 술은 AlcoholRequest로 등록 요청 → 승인 후 노트 작성
 - title → 필수
 - rating → 필수, 5점 만점 (0.5~5.0, 0.5단위) — DECIMAL(2,1), Java 타입 BigDecimal (11회차에 Double → BigDecimal 전환)
-- taste, aroma → **Vivino 방식으로 확정** — Note 엔티티에 String 필드 없음, NoteFlavor 중간 테이블로 관리
+- taste, aroma → **출시 전 자유 텍스트로 임시 전환 (20회차, 2026-04-19)** — Note 엔티티에 String 필드로 저장
+  - 이유: 출시 일정으로 인해 임시 자유텍스트 방식 채택. NoteFlavor 중간 테이블/FlavorSuggestion은 코드에 유지
+  - **출시 후 Vivino 방식으로 재전환 예정** — FlavorSuggestion 선택 목록 + NoteFlavor 중간 테이블
 - pairing, description → 자유 텍스트
 - location → 자유 텍스트, 선택
 - drankAt → 선택

@@ -1,8 +1,6 @@
 package com.dongjin.tastingnote.note.dto;
 
-import com.dongjin.tastingnote.note.entity.FlavorType;
 import com.dongjin.tastingnote.note.entity.Note;
-import com.dongjin.tastingnote.note.entity.NoteFlavor;
 import com.dongjin.tastingnote.note.entity.NoteImage;
 import com.dongjin.tastingnote.note.entity.NoteStatus;
 import lombok.Builder;
@@ -23,8 +21,8 @@ public class NoteResponse {
     private String alcoholName;
     private String alcoholNameKo;
     private String title;
-    private List<FlavorItem> tastes;
-    private List<FlavorItem> aromas;
+    private String taste;
+    private String aroma;
     private List<String> imageUrls;
     private String pairing;
     private BigDecimal rating;
@@ -36,30 +34,7 @@ public class NoteResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    @Getter
-    @Builder
-    public static class FlavorItem {
-        private Long id;
-        private String name;
-    }
-
-    public static NoteResponse from(Note note, List<NoteFlavor> flavors, List<NoteImage> images) {
-        List<FlavorItem> tastes = flavors.stream()
-                .filter(f -> f.getType() == FlavorType.TASTE)
-                .map(f -> FlavorItem.builder()
-                        .id(f.getFlavor().getId())
-                        .name(f.getFlavor().getName())
-                        .build())
-                .toList();
-
-        List<FlavorItem> aromas = flavors.stream()
-                .filter(f -> f.getType() == FlavorType.AROMA)
-                .map(f -> FlavorItem.builder()
-                        .id(f.getFlavor().getId())
-                        .name(f.getFlavor().getName())
-                        .build())
-                .toList();
-
+    public static NoteResponse from(Note note, List<NoteImage> images) {
         return NoteResponse.builder()
                 .id(note.getId())
                 .userId(note.getUser().getId())
@@ -67,8 +42,8 @@ public class NoteResponse {
                 .alcoholName(note.getAlcohol().getName())
                 .alcoholNameKo(note.getAlcohol().getNameKo())
                 .title(note.getTitle())
-                .tastes(tastes)
-                .aromas(aromas)
+                .taste(note.getTaste())
+                .aroma(note.getAroma())
                 .imageUrls(images.stream().map(NoteImage::getImageUrl).toList())
                 .pairing(note.getPairing())
                 .rating(note.getRating())
