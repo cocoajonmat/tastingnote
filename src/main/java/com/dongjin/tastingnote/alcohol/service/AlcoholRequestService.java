@@ -1,5 +1,6 @@
 package com.dongjin.tastingnote.alcohol.service;
 
+import com.dongjin.tastingnote.alcohol.dto.AlcoholAliasCreateRequest;
 import com.dongjin.tastingnote.alcohol.dto.AlcoholRequestCreateRequest;
 import com.dongjin.tastingnote.alcohol.dto.AlcoholRequestResponse;
 import com.dongjin.tastingnote.alcohol.dto.AlcoholResponse;
@@ -29,6 +30,10 @@ public class AlcoholRequestService {
 
     @Transactional
     public void request(Long userId, AlcoholRequestCreateRequest req) {
+        if (isBlank(req.getName()) && isBlank(req.getNameKo())) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
@@ -36,6 +41,7 @@ public class AlcoholRequestService {
 
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
+                .type(AlcoholRequestType.NEW)
                 .name(req.getName())
                 .nameKo(req.getNameKo())
                 .aliases(req.getAliases() != null ? req.getAliases() : List.of())
@@ -46,12 +52,37 @@ public class AlcoholRequestService {
         alcoholRequestRepository.save(alcoholRequest);
     }
 
+    @Transactional
+    public void requestAlias(Long userId, Long alcoholId, AlcoholAliasCreateRequest req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Alcohol target = alcoholRepository.findById(alcoholId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
+
+        AlcoholRequest alcoholRequest = AlcoholRequest.builder()
+                .requestedBy(user)
+                .type(AlcoholRequestType.ALIAS)
+                .targetAlcohol(target)
+                .aliases(req.getAliases())
+                .reason(req.getReason())
+                .build();
+
+        alcoholRequestRepository.save(alcoholRequest);
+    }
+
     @Transactional(readOnly = true)
-    public List<AlcoholRequestResponse> getRequests(AlcoholRequestStatus status) {
-        return alcoholRequestRepository.findAllByStatusOrderByCreatedAtDesc(status).stream()
+    public List<AlcoholRequestResponse> getRequests(AlcoholRequestStatus status, AlcoholRequestType type) {
+        List<AlcoholRequest> requests = type != null
+                ? alcoholRequestRepository.findAllByStatusAndTypeOrderByCreatedAtDesc(status, type)
+                : alcoholRequestRepository.findAllByStatusOrderByCreatedAtDesc(status);
+
+        return requests.stream()
                 .map(r -> {
-                    List<AlcoholResponse> similar = alcoholRepository.searchByKeyword(r.getName())
-                            .stream().map(AlcoholResponse::from).toList();
+                    String searchKey = !isBlank(r.getName()) ? r.getName() : r.getNameKo();
+                    List<AlcoholResponse> similar = searchKey != null
+                            ? alcoholRepository.searchByKeyword(searchKey).stream().map(AlcoholResponse::from).toList()
+                            : List.of();
                     return AlcoholRequestResponse.from(r, similar);
                 })
                 .toList();
@@ -59,7 +90,7 @@ public class AlcoholRequestService {
 
     @Transactional
     public void approve(Long requestId) {
-        AlcoholRequest req = findPendingRequest(requestId);
+        AlcoholRequest req = findPendingRequestOfType(requestId, AlcoholRequestType.NEW);
 
         Alcohol alcohol = Alcohol.builder()
                 .name(req.getName())
@@ -68,49 +99,21 @@ public class AlcoholRequestService {
                 .build();
         alcoholRepository.save(alcohol);
 
-        saveAliases(alcohol, req);
+        saveNewAlcoholAliases(alcohol, req);
         req.approve();
     }
 
     @Transactional
-    public void merge(Long requestId, Long alcoholId) {
-        AlcoholRequest req = findPendingRequest(requestId);
+    public void approveAlias(Long requestId) {
+        AlcoholRequest req = findPendingRequestOfType(requestId, AlcoholRequestType.ALIAS);
+        Alcohol target = req.getTargetAlcohol();
 
-        Alcohol target = alcoholRepository.findById(alcoholId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
-
-        saveAliases(target, req);
-        req.merge(target);
-    }
-
-    // name, nameKo, aliases 전부 alias로 저장 (중복 제외)
-    private void saveAliases(Alcohol alcohol, AlcoholRequest req) {
-        List<String> candidates = new ArrayList<>();
-        candidates.add(req.getName());
-        if (req.getNameKo() != null && !req.getNameKo().isBlank()) {
-            candidates.add(req.getNameKo());
-        }
-        candidates.addAll(req.getAliases());
-
-        List<AlcoholAlias> toSave = candidates.stream()
+        List<AlcoholAlias> toSave = req.getAliases().stream()
                 .filter(a -> !alcoholAliasRepository.existsByAliasIgnoreCase(a))
-                .map(a -> AlcoholAlias.builder()
-                        .alcohol(alcohol)
-                        .alias(a)
-                        .build())
+                .map(a -> AlcoholAlias.builder().alcohol(target).alias(a).build())
                 .toList();
         alcoholAliasRepository.saveAll(toSave);
-    }
-
-    // 이름 중복 검증 헬퍼 (요청 이력 + 기존 술 + 별칭 통합 체크)
-    private void validateNoDuplicateName(User user, String name, String nameKo) {
-        if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, name)
-                || alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(name, AlcoholRequestStatus.PENDING)
-                || alcoholRepository.existsByNameIgnoreCase(name)
-                || alcoholRepository.existsByNameKoIgnoreCase(nameKo)
-                || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
-            throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
-        }
+        req.approve();
     }
 
     @Transactional
@@ -119,13 +122,53 @@ public class AlcoholRequestService {
         req.reject(rejectReason);
     }
 
+    private void saveNewAlcoholAliases(Alcohol alcohol, AlcoholRequest req) {
+        List<String> candidates = new ArrayList<>();
+        if (!isBlank(req.getName())) candidates.add(req.getName());
+        if (!isBlank(req.getNameKo())) candidates.add(req.getNameKo());
+        candidates.addAll(req.getAliases());
+
+        List<AlcoholAlias> toSave = candidates.stream()
+                .filter(a -> !alcoholAliasRepository.existsByAliasIgnoreCase(a))
+                .map(a -> AlcoholAlias.builder().alcohol(alcohol).alias(a).build())
+                .toList();
+        alcoholAliasRepository.saveAll(toSave);
+    }
+
+    private void validateNoDuplicateName(User user, String name, String nameKo) {
+        if (!isBlank(name)) {
+            if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, name)
+                    || alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(name, AlcoholRequestStatus.PENDING)
+                    || alcoholRepository.existsByNameIgnoreCase(name)
+                    || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
+                throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+            }
+        }
+        if (!isBlank(nameKo)) {
+            if (alcoholRepository.existsByNameKoIgnoreCase(nameKo)) {
+                throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
+            }
+        }
+    }
+
     private AlcoholRequest findPendingRequest(Long requestId) {
         AlcoholRequest req = alcoholRequestRepository.findById(requestId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_REQUEST_NOT_FOUND));
-
         if (req.getStatus() != AlcoholRequestStatus.PENDING) {
             throw new BusinessException(ErrorCode.ALREADY_PROCESSED);
         }
         return req;
+    }
+
+    private AlcoholRequest findPendingRequestOfType(Long requestId, AlcoholRequestType expectedType) {
+        AlcoholRequest req = findPendingRequest(requestId);
+        if (req.getType() != expectedType) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT);
+        }
+        return req;
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }

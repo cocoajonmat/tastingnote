@@ -6,6 +6,38 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-19 — AlcoholRequest v2 리팩터링 (18회차)
+
+### Changed
+- `AlcoholRequest` 엔티티: `type`(NEW/ALIAS, NOT NULL), `targetAlcohol`(@ManyToOne nullable) 추가; `name`, `category` nullable로 변경
+  - 이유: 기존 구조는 영문 name 필수라 한글 명칭만 아는 유저가 요청하기 까다로웠음. name/nameKo 중 하나만 알아도 등록 요청 가능하도록 완화.
+- `AlcoholRequestCreateRequest`: `@NotBlank` 제거 → `@Size(max=100)` (서비스에서 name/nameKo 중 하나 이상 검증)
+- `AlcoholRequestService.getRequests()`: `type` 파라미터 추가 (null이면 전체, NEW/ALIAS 필터 가능)
+- `AlcoholRequestService.approve()`: `findPendingRequestOfType(NEW)` 적용 — ALIAS 요청에 잘못 호출되면 400 반환
+- `AdminAlcoholRequestController.getRequests()`: `type` 쿼리 파라미터 추가
+
+### Added
+- `AlcoholRequestType` enum (NEW / ALIAS)
+- `AlcoholAliasCreateRequest` DTO: aliases(@NotEmpty), reason(optional)
+- `AlcoholRequestService.requestAlias()`: 기존 술에 별칭 추가 요청 (type=ALIAS로 저장)
+- `AlcoholRequestService.approveAlias()`: ALIAS 요청 승인 → AlcoholAlias에 추가, status=APPROVED
+- `POST /api/alcohol-requests/{alcoholId}/alias` — 유저: 별칭 추가 요청
+- `POST /api/admin/alcohol-requests/{id}/approve-alias` — 관리자: 별칭 요청 승인
+- `AlcoholRequestResponse`: type, targetAlcoholId, targetAlcoholName 필드 추가
+
+### Removed
+- `AlcoholRequestService.merge()` — 관리자 주도 별칭 병합 대신 유저 주도 ALIAS 요청으로 대체
+- `AdminAlcoholRequestController.merge()` — 동일 사유
+- `AlcoholRequestServiceTest.java` — 토큰 비용 대비 유지 가치가 낮아 삭제
+
+### 결정 배경
+- 기존 `merge` 엔드포인트: 관리자가 직접 대상 술을 찾아서 병합 처리해야 했음 — 운영 부담
+- 새 방식: 유저가 "이 술(alcoholId)에 이 별칭을 추가해달라"고 직접 요청 → 관리자는 approve-alias만 클릭
+- 유저가 실제로 쓰는 별칭을 더 잘 알고 있으므로 데이터 품질도 향상됨
+- prod DB 기존 레코드 처리 필요: `UPDATE alcohol_request SET type = 'NEW' WHERE type IS NULL;`
+
+---
+
 ## 2026-04-19 — 버그 수정 9건 (17회차)
 
 ### Fixed

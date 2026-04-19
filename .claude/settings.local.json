@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-21.0.6.7-hotspot\" ./gradlew compileJava)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Eclipse Adoptium/jdk-21.0.6.7-hotspot\" ./gradlew compileJava)"
+    ]
+  }
+}
