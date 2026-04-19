@@ -521,6 +521,6 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 인프라
 - 서버: AWS Lightsail (13.124.79.235)
 - CI/CD: GitHub Actions → SSH → systemctl restart tastingnote
-- Swagger: http://13.124.79.235:8080/tastingnote.swagger
+- Swagger: https://myfirstsbproject.shop/swagger-ui/index.html
 - 로컬: H2 인메모리 DB (application-local.yaml)
 - 서버: MySQL (application-prod.yaml, 환경변수로 주입)

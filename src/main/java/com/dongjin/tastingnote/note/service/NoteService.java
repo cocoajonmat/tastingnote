@@ -145,6 +145,8 @@ public class NoteService {
         // 이미지 교체 (전달된 경우만)
         List<NoteImage> savedImages;
         if (images != null && !images.isEmpty()) {
+            List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
+            if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
             List<NoteImage> oldImages = noteImageRepository.findAllByNoteId(noteId); // context clear 후 fresh 조회
             deleteImagesFromS3(oldImages);
             noteImageRepository.deleteAllByNoteId(noteId);
@@ -224,11 +226,12 @@ public class NoteService {
     // 이미지 S3 업로드 후 NoteImage 저장 — 저장된 리스트 반환 (DB 쿼리 절약)
     private List<NoteImage> saveImages(Note note, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) return List.of();
-        if (images.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
+
+        List<MultipartFile> nonEmpty = images.stream().filter(f -> !f.isEmpty()).toList();
+        if (nonEmpty.size() > 3) throw new BusinessException(ErrorCode.IMAGE_LIMIT_EXCEEDED);
 
         List<NoteImage> noteImages = new ArrayList<>();
-        for (MultipartFile file : images) {
-            if (file.isEmpty()) continue;
+        for (MultipartFile file : nonEmpty) {
             validateImageType(file);
             String ext = Optional.ofNullable(StringUtils.getFilenameExtension(file.getOriginalFilename()))
                     .orElse("jpg");
