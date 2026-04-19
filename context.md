@@ -267,6 +267,17 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- AlcoholRequest v2 리팩터링 + 검증 강화 (feature/alcohol-request-v2, 18회차)
+  - `AlcoholRequestType` enum 신설 (NEW / ALIAS)
+  - `AlcoholRequest` 엔티티: `type`(NOT NULL), `targetAlcohol` 추가; `name`, `category` nullable 변경; `mergedToAlcohol`/`merge()` 제거
+  - `AlcoholRequestStatus.MERGED` 제거 → PENDING / APPROVED / REJECTED만 유지
+  - 유저 API: `POST /api/alcohol-requests` (name OR nameKo 하나 이상 필수), `POST /api/alcohol-requests/{alcoholId}/alias` 신설 (단일 `alias` 필드)
+  - 관리자 API: `approve-alias` 추가, `merge` 제거, `GET` type 필터 추가
+  - `AlcoholAliasCreateRequest` DTO: `List<String> aliases` → `String alias` 단일 필드
+  - `AlcoholRequestResponse`: type, targetAlcoholId, targetAlcoholName 추가
+  - ErrorCode `ALCOHOL_ALREADY_EXISTS` 추가 — DB 등록 vs PENDING 중복 에러 분리
+  - 검증 강화 7건: nameKo AlcoholRequest/AlcoholAlias 체크, name↔nameKo 크로스 필드 체크, ALIAS 요청 PENDING 중복 체크(JPQL), 공식명칭 별칭 요청 차단
+  - prod DB 기존 레코드 처리: `UPDATE alcohol_request SET type = 'NEW' WHERE type IS NULL;` 필요
 - 버그 수정 9건 (fix/17th-session-bugfix, 17회차)
   - C1 테스트 오타, C2 updateNote 이미지 유실, C3 헤더 누락 500, C4 카테고리 substring 과잉매칭, C5 nameKo 중복 체크 누락
   - H1 빈 파일 필터 순서, H2 다른 유저 PENDING 중복 허용, H3 S3 delete 예외 미처리, M1 중복 import
@@ -473,10 +484,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
    - 나중에 어드민 페이지 만들 때 프론트만 얹으면 됨 (백엔드 API 변경 불필요)
    - 목록 조회 응답에 similarAlcohols 포함 (기존 DB에서 유사 술 자동 검색 → 병합 판단 도움)
 ---
-> **AlcoholRequest 리팩터링 계획 (2026-04-19 확정)**
-> 브랜치: `feature/alcohol-request-v2` (다음 세션에서 시작)
-
-3-1. **AlcoholRequest 리팩터링** ← 다음 작업
+3-1. ~~**AlcoholRequest 리팩터링**~~ ✅ 완료 (18회차, feature/alcohol-request-v2)
    - **배경**: 현재 구조는 name(영문 필수) + nameKo(선택)인데, 유저가 영어 명칭을 모를 수도 있고 한국어 명칭만 알 수도 있음. 불필요하게 까다로움.
    - **변경 방향**: 신규 등록 / 별칭 추가를 같은 테이블(AlcoholRequest)에서 type으로 구분
    
@@ -525,7 +533,9 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 5. ~~**NoteImage S3 업로드**~~ ✅ 완료 (17회차, 2026-04-17, PR #10)
 
-6. **소셜 로그인 (OAuth2)** → 완료 후 출시
+5-1. ~~**AlcoholRequest v2 리팩터링**~~ ✅ 완료 (18회차, 2026-04-19)
+
+6. **소셜 로그인 (OAuth2)** → 완료 후 출시 ← 다음 작업
    - 카카오 / 구글 / 네이버
 
 7. **[출시 직전] Flyway 도입 + ddl-auto: validate 전환**

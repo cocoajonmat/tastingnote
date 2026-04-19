@@ -6,6 +6,78 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-19 — AlcoholRequest 검증 강화 및 버그 7건 수정 (18회차 후속)
+
+### Fixed
+
+- **nameKo AlcoholRequest 중복 체크 누락** — `validateNoDuplicateName()`
+  - 이유: nameKo는 `alcoholRepository`만 체크하고 `AlcoholRequest` 테이블은 안 봐서, 같은 nameKo로 PENDING 요청이 이미 있어도 또 요청 가능했음.
+  - 수정: `existsByRequestedByAndNameKoIgnoreCase`, `existsByNameKoIgnoreCaseAndStatus` 추가.
+
+- **nameKo AlcoholAlias 중복 체크 누락** — `validateNoDuplicateName()`
+  - 이유: name은 AlcoholAlias까지 체크하는데 nameKo는 안 했음. nameKo가 이미 별칭으로 등록된 경우 감지 불가.
+  - 수정: `alcoholAliasRepository.existsByAliasIgnoreCase(nameKo)` 체크 추가.
+
+- **name↔nameKo 크로스 필드 PENDING 중복 체크 누락** — `validateNoDuplicateName()`
+  - 이유: A가 `name="블레어우드 리저브"`로 PENDING 중일 때 B가 `nameKo="블레어우드 리저브"`로 요청하면 통과됨. name 체크는 `name` 컬럼만, nameKo 체크는 `nameKo` 컬럼만 봤기 때문.
+  - 수정: name 체크 시 `existsByNameKoIgnoreCaseAndStatus(name, PENDING)`도 추가; nameKo 체크 시 `existsByNameIgnoreCaseAndStatus(nameKo, PENDING)`도 추가.
+
+- **ALIAS 요청 시 공식명칭 차단 누락** — `requestAlias()`
+  - 이유: `alcoholAliasRepository`만 체크해서 `Alcohol.name` / `Alcohol.nameKo`와 동일한 값을 별칭으로 요청해도 통과됨.
+  - 수정: `alcoholRepository.existsByNameIgnoreCase`, `existsByNameKoIgnoreCase` 체크 추가.
+
+- **ALIAS 요청 시 동일 alias PENDING 중복 체크 누락** — `requestAlias()`
+  - 이유: 다른 유저가 이미 같은 alias를 PENDING으로 요청한 경우를 감지하지 못함.
+  - 수정: `existsByAliasIgnoreCaseAndStatus(alias, PENDING)` JPQL 커스텀 쿼리 추가 (`JOIN r.aliases`).
+
+- **ALCOHOL_ALREADY_EXISTS vs DUPLICATE_ALCOHOL_REQUEST 에러 미분리** — `validateNoDuplicateName()`, `requestAlias()`
+  - 이유: DB에 이미 등록된 술과 누군가 PENDING 중인 요청이 같은 `DUPLICATE_ALCOHOL_REQUEST` 에러로 반환돼 클라이언트가 원인을 구분 불가.
+  - 수정: `ErrorCode.ALCOHOL_ALREADY_EXISTS`(409) 신설. DB 존재 → `ALCOHOL_ALREADY_EXISTS`, PENDING 중 → `DUPLICATE_ALCOHOL_REQUEST`.
+
+- **MERGED 상태 및 관련 데드코드 잔존** — `AlcoholRequest`, `AlcoholRequestStatus`
+  - 이유: 18회차에 merge 엔드포인트를 제거했지만 `MERGED` 상태, `mergedToAlcohol` 필드, `merge()` 메서드가 엔티티에 남아 있었음.
+  - 수정: 세 가지 모두 제거.
+
+### Changed
+
+- `AlcoholAliasCreateRequest`: `List<String> aliases` → `String alias` 단일 필드
+  - 이유: "한 술에 한 번, 한 개의 별칭만 요청 가능" 정책 반영. 리스트 허용 시 한 요청에 여러 별칭을 넣어 정책 우회 가능.
+  - `approveAlias()`도 단일 alias 처리로 단순화.
+
+---
+
+## 2026-04-19 — AlcoholRequest v2 리팩터링 (18회차)
+
+### Changed
+- `AlcoholRequest` 엔티티: `type`(NEW/ALIAS, NOT NULL), `targetAlcohol`(@ManyToOne nullable) 추가; `name`, `category` nullable로 변경
+  - 이유: 기존 구조는 영문 name 필수라 한글 명칭만 아는 유저가 요청하기 까다로웠음. name/nameKo 중 하나만 알아도 등록 요청 가능하도록 완화.
+- `AlcoholRequestCreateRequest`: `@NotBlank` 제거 → `@Size(max=100)` (서비스에서 name/nameKo 중 하나 이상 검증)
+- `AlcoholRequestService.getRequests()`: `type` 파라미터 추가 (null이면 전체, NEW/ALIAS 필터 가능)
+- `AlcoholRequestService.approve()`: `findPendingRequestOfType(NEW)` 적용 — ALIAS 요청에 잘못 호출되면 400 반환
+- `AdminAlcoholRequestController.getRequests()`: `type` 쿼리 파라미터 추가
+
+### Added
+- `AlcoholRequestType` enum (NEW / ALIAS)
+- `AlcoholAliasCreateRequest` DTO: aliases(@NotEmpty), reason(optional)
+- `AlcoholRequestService.requestAlias()`: 기존 술에 별칭 추가 요청 (type=ALIAS로 저장)
+- `AlcoholRequestService.approveAlias()`: ALIAS 요청 승인 → AlcoholAlias에 추가, status=APPROVED
+- `POST /api/alcohol-requests/{alcoholId}/alias` — 유저: 별칭 추가 요청
+- `POST /api/admin/alcohol-requests/{id}/approve-alias` — 관리자: 별칭 요청 승인
+- `AlcoholRequestResponse`: type, targetAlcoholId, targetAlcoholName 필드 추가
+
+### Removed
+- `AlcoholRequestService.merge()` — 관리자 주도 별칭 병합 대신 유저 주도 ALIAS 요청으로 대체
+- `AdminAlcoholRequestController.merge()` — 동일 사유
+- `AlcoholRequestServiceTest.java` — 토큰 비용 대비 유지 가치가 낮아 삭제
+
+### 결정 배경
+- 기존 `merge` 엔드포인트: 관리자가 직접 대상 술을 찾아서 병합 처리해야 했음 — 운영 부담
+- 새 방식: 유저가 "이 술(alcoholId)에 이 별칭을 추가해달라"고 직접 요청 → 관리자는 approve-alias만 클릭
+- 유저가 실제로 쓰는 별칭을 더 잘 알고 있으므로 데이터 품질도 향상됨
+- prod DB 기존 레코드 처리 필요: `UPDATE alcohol_request SET type = 'NEW' WHERE type IS NULL;`
+
+---
+
 ## 2026-04-19 — 버그 수정 9건 (17회차)
 
 ### Fixed
