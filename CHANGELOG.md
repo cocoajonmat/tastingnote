@@ -6,6 +6,50 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-19 — 버그 수정 9건 (17회차)
+
+### Fixed
+
+- **C1. 테스트 오타** — `AlcoholRequestServiceTest.java:228` `alcoholRequestServiceet` → `alcoholRequestService`
+  - 이유: 단순 오타. 컴파일 오류 발생.
+
+- **C2. updateNote 이미지 유실 버그** — `NoteService.updateNote()`
+  - 이유: 이미지 4장 전달 시 S3 먼저 삭제 → `saveImages`에서 `IMAGE_LIMIT_EXCEEDED` 예외 → DB 롤백되지만 S3 파일은 이미 삭제된 상태. 데이터 유실 발생.
+  - 수정: `deleteImagesFromS3` 호출 전에 `images.size() > 3` 선체크 추가.
+
+- **C3. Refresh-Token 헤더 누락 시 500** — `GlobalExceptionHandler`
+  - 이유: `MissingRequestHeaderException` 핸들러가 없어서 generic `Exception.class`로 빠져 500 반환. 헤더 누락은 클라이언트 실수이므로 400이어야 함.
+  - 수정: `MissingRequestHeaderException` 핸들러 추가 (400 반환).
+
+- **C4. AlcoholCategory substring 과잉 매칭** — `AlcoholCategory.findByName()`
+  - 이유: `contains` 방식 사용으로 `"begin"` 검색 시 GIN 카테고리 매칭, `"winery"` 검색 시 WINE 전체 반환 등 의도치 않은 카테고리 매칭 발생.
+  - 수정: `equalsIgnoreCase` 방식으로 변경 — 정확히 카테고리 이름을 입력했을 때만 매칭.
+
+- **C5. Alcohol 중복 체크 nameKo 누락** — `AlcoholRequestService.validateNoDuplicateName()`
+  - 이유: 영문 name만 중복 체크하고 nameKo는 체크하지 않아, 한글명이 같은 Alcohol이 중복 생성될 수 있었음.
+  - 수정: `alcoholRepository.existsByNameKoIgnoreCase(nameKo)` 체크 추가. nameKo는 null 가능이므로 null 가드(`nameKo != null && ...`) 포함.
+
+- **H1. 빈 MultipartFile 처리 순서** — `NoteService.saveImages()`
+  - 이유: 빈 파일 필터링 전에 `size > 3` 체크 → 이미지 3장 + 빈 파트 1개 전송 시 오류. 브라우저가 빈 파일 파트를 함께 전송하는 경우 발생.
+  - 수정: `filter(!f.isEmpty())` 후 size 체크 순서로 변경.
+
+- **H2. 다른 유저 PENDING 요청 중복 방지 미흡** — `AlcoholRequestService.validateNoDuplicateName()`
+  - 이유: 본인 이력만 체크하고, 다른 유저가 이미 같은 이름으로 PENDING 요청을 넣은 경우를 허용. 관리자가 같은 술에 대한 요청을 중복 처리해야 하는 비효율 발생.
+  - 수정: `alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(name, PENDING)` 체크 추가.
+
+- **H3. S3Service.delete() 예외 처리 없음** — `S3Service.delete()`
+  - 이유: `upload()`는 try/catch 있지만 `delete()`는 없어 SDK 예외 발생 시 500 반환. 삭제 실패로 노트 삭제까지 막히는 것은 부적절 — 고아 파일 정도는 허용하는 것이 낫고 로그로 추적하면 충분.
+  - 수정: try/catch 추가, 실패 시 `log.warn`만 남기고 계속 진행.
+
+- **M1. 중복 import** — `AlcoholRequestService.java`
+  - 이유: `import java.util.ArrayList` 2번 선언. 16회차 리팩터링 시 남은 잔재.
+  - 수정: 중복 제거.
+
+### Planned (다음 브랜치: feature/alcohol-request-v2)
+- AlcoholRequest 리팩터링 — type(NEW/ALIAS) 분리, 영/한 자유 입력, 별칭 요청 API 신설 (자세한 내용은 context.md 3-1 항목 참고)
+
+---
+
 ## 2026-04-17 — 노트 이미지 S3 업로드 구현 (17회차)
 
 ### Added

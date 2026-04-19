@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -33,7 +32,7 @@ public class AlcoholRequestService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
-        validateNoDuplicateName(user, req.getName());
+        validateNoDuplicateName(user, req.getName(), req.getNameKo());
 
         AlcoholRequest alcoholRequest = AlcoholRequest.builder()
                 .requestedBy(user)
@@ -104,9 +103,11 @@ public class AlcoholRequestService {
     }
 
     // 이름 중복 검증 헬퍼 (요청 이력 + 기존 술 + 별칭 통합 체크)
-    private void validateNoDuplicateName(User user, String name) {
+    private void validateNoDuplicateName(User user, String name, String nameKo) {
         if (alcoholRequestRepository.existsByRequestedByAndNameIgnoreCase(user, name)
+                || alcoholRequestRepository.existsByNameIgnoreCaseAndStatus(name, AlcoholRequestStatus.PENDING)
                 || alcoholRepository.existsByNameIgnoreCase(name)
+                || alcoholRepository.existsByNameKoIgnoreCase(nameKo)
                 || alcoholAliasRepository.existsByAliasIgnoreCase(name)) {
             throw new BusinessException(ErrorCode.DUPLICATE_ALCOHOL_REQUEST);
         }

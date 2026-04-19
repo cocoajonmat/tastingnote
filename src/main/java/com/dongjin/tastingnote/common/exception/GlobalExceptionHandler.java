@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -73,6 +74,13 @@ public class GlobalExceptionHandler {
         notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(e.getParameterName() + " 파라미터가 필요합니다"));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e, HttpServletRequest request) {
+        notificationPort.sendError(e, request, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(e.getHeaderName() + " 헤더가 필요합니다"));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

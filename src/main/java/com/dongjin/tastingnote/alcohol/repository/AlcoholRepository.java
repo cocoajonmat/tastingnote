@@ -22,4 +22,6 @@ public interface AlcoholRepository extends JpaRepository<Alcohol, Long> {
     List<Alcohol> findAllByCategory(AlcoholCategory category);
 
     boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByNameKoIgnoreCase(String nameKo);
 }

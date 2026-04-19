@@ -3,6 +3,7 @@ package com.dongjin.tastingnote.common.s3;
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,6 +12,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class S3Service implements S3Port {
@@ -42,6 +44,10 @@ public class S3Service implements S3Port {
 
     @Override
     public void delete(String key) {
-        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+        } catch (Exception e) {
+            log.warn("[S3 삭제 실패] key={}, message={}", key, e.getMessage());
+        }
     }
 }
