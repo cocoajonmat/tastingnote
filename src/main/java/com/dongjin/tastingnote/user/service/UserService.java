@@ -78,6 +78,13 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserInfoResponse getUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        return UserInfoResponse.from(user);
+    }
+
+    @Transactional(readOnly = true)
     public void checkNicknameAvailable(String nickname) {
         if (userRepository.existsByNicknameAndDeletedAtIsNull(nickname)) {
             throw new BusinessException(ErrorCode.NICKNAME_ALREADY_EXISTS);

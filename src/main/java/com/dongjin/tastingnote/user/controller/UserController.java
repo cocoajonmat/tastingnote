@@ -48,6 +48,13 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @Operation(summary = "내 정보 조회", description = "현재 로그인된 사용자의 정보를 반환합니다.")
+    @SecurityRequirement(name = "bearerAuth")
+    @GetMapping("me")
+    public ResponseEntity<UserInfoResponse> getMyInfo(@CurrentUserId Long userId) {
+        return ResponseEntity.ok(userService.getUserInfo(userId));
+    }
+
     @Operation(summary = "닉네임 중복 확인", description = "해당 닉네임이 사용 가능한지 확인합니다. 사용 가능하면 200, 이미 존재하면 409를 반환합니다.")
     @GetMapping("check-nickname")
     public ResponseEntity<Void> checkNickname(@RequestParam String nickname) {
