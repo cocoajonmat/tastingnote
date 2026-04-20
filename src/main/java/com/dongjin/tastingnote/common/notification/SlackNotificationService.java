@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class SlackNotificationService implements NotificationPort {
             return;
         }
 
-        String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String time = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         boolean isServerError = status.is5xxServerError();
         String emoji = isServerError ? "🚨" : "⚠️";
         String level = isServerError ? "서버 에러" : "클라이언트 에러";
@@ -66,7 +67,7 @@ public class SlackNotificationService implements NotificationPort {
             return;
         }
 
-        String time = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String time = LocalDateTime.now(ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String userInfo = feedback.getUser() != null
                 ? feedback.getUser().getNickname() + " (userId: " + feedback.getUser().getId() + ")"
                 : "익명";
