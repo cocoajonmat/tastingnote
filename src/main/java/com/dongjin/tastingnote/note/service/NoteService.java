@@ -2,8 +2,11 @@ package com.dongjin.tastingnote.note.service;
 
 import com.dongjin.tastingnote.alcohol.entity.Alcohol;
 import com.dongjin.tastingnote.alcohol.repository.AlcoholRepository;
+import com.dongjin.tastingnote.common.cursor.CursorUtils;
 import com.dongjin.tastingnote.common.exception.BusinessException;
 import com.dongjin.tastingnote.common.exception.ErrorCode;
+import com.dongjin.tastingnote.common.response.CursorPageResponse;
+import com.dongjin.tastingnote.common.response.OffsetPageResponse;
 import com.dongjin.tastingnote.common.s3.S3Port;
 import com.dongjin.tastingnote.note.dto.NoteBaseRequest;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
@@ -20,16 +23,21 @@ import com.dongjin.tastingnote.tag.repository.NoteTagRepository;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.groupingBy;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +53,6 @@ public class NoteService {
     private final NoteTagRepository noteTagRepository;
     private final S3Port s3Port;
 
-    // rating 0.5 단위 검증 (1.0, 1.5, 2.0 ... 5.0)
     private static final BigDecimal RATING_STEP = new BigDecimal("0.5");
 
     private void validateRating(BigDecimal rating) {
@@ -54,7 +61,6 @@ public class NoteService {
         }
     }
 
-    // 노트 생성 (기본 임시저장 상태)
     @Transactional
     public NoteResponse createNote(Long userId, NoteCreateRequest request) {
         validateRating(request.getRating());
@@ -64,14 +70,12 @@ public class NoteService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
-
         Note note = buildNote(user, alcohol, request);
         noteRepository.save(note);
 
         return toResponse(note, List.of());
     }
 
-    // 노트 단건 조회
     public NoteResponse getNote(Long requesterId, Long noteId) {
         Note note = noteRepository.findByIdWithAlcoholAndUser(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
@@ -88,28 +92,102 @@ public class NoteService {
         return toResponse(note);
     }
 
-    // 내 노트 전체 조회
-    public List<NoteResponse> getMyNotes(Long userId) {
-        return noteRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::toResponse)
-                .toList();
+    public OffsetPageResponse<NoteResponse> getMyNotesPaged(Long userId, NoteStatus status, int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size);
+        Page<Note> notePage = status != null
+                ? noteRepository.findMyNotesPagedByStatus(userId, status, pageable)
+                : noteRepository.findMyNotesPaged(userId, pageable);
+
+        List<NoteResponse> content = toResponseList(notePage.getContent());
+        return new OffsetPageResponse<>(
+                content,
+                notePage.getNumber(),
+                notePage.getSize(),
+                notePage.getTotalElements(),
+                notePage.getTotalPages(),
+                notePage.hasNext()
+        );
     }
 
-    // 내 노트 상태별 조회 (DRAFT or PUBLISHED)
-    public List<NoteResponse> getMyNotesByStatus(Long userId, NoteStatus status) {
-        return noteRepository.findAllByUserIdAndStatusOrderByCreatedAtDesc(userId, status).stream()
-                .map(this::toResponse)
-                .toList();
+    public CursorPageResponse<NoteResponse> getPublicNotesCursor(String cursor, int size, String sort) {
+        return switch (sort) {
+            case "popular" -> getPublicPopular(cursor, size);
+            case "hot" -> getPublicHot(cursor, size);
+            default -> getPublicLatest(cursor, size);
+        };
     }
 
-    // 공개 노트 전체 조회 (소셜 피드)
-    public List<NoteResponse> getPublicNotes() {
-        return noteRepository.findAllByIsPublicTrueAndStatusOrderByCreatedAtDesc(NoteStatus.PUBLISHED).stream()
-                .map(this::toResponse)
-                .toList();
+    private CursorPageResponse<NoteResponse> getPublicLatest(String cursor, int size) {
+        long cursorId = CursorUtils.parseLongId(cursor);
+        List<Note> notes = noteRepository.findPublicLatestByCursor(
+                cursorId, NoteStatus.PUBLISHED, PageRequest.of(0, size + 1));
+        return buildCursorResponse(notes, size,
+                last -> CursorUtils.encode(Map.of("id", String.valueOf(last.getId()))));
     }
 
-    // 노트 수정
+    private CursorPageResponse<NoteResponse> getPublicPopular(String cursor, int size) {
+        int cursorLikeCount = Integer.MAX_VALUE;
+        long cursorId = Long.MAX_VALUE;
+        if (cursor != null) {
+            Map<String, String> params = CursorUtils.decode(cursor);
+            cursorLikeCount = Integer.parseInt(params.get("likeCount"));
+            cursorId = Long.parseLong(params.get("id"));
+        }
+        List<Note> notes = noteRepository.findPublicPopularByCursor(
+                cursorLikeCount, cursorId, NoteStatus.PUBLISHED, PageRequest.of(0, size + 1));
+        return buildCursorResponse(notes, size, last -> CursorUtils.encode(Map.of(
+                "likeCount", String.valueOf(last.getLikeCount()),
+                "id", String.valueOf(last.getId()))));
+    }
+
+    private CursorPageResponse<NoteResponse> getPublicHot(String cursor, int size) {
+        double cursorHotScore = Double.MAX_VALUE;
+        long cursorId = Long.MAX_VALUE;
+        if (cursor != null) {
+            Map<String, String> params = CursorUtils.decode(cursor);
+            int likeCount = Integer.parseInt(params.get("likeCount"));
+            LocalDateTime createdAt = LocalDateTime.parse(params.get("createdAt"));
+            long hoursAgo = ChronoUnit.HOURS.between(createdAt, LocalDateTime.now());
+            cursorHotScore = likeCount / Math.pow(hoursAgo + 2.0, 1.5);
+            cursorId = Long.parseLong(params.get("id"));
+        }
+
+        List<Long> ids = noteRepository.findPublicHotIdsByCursor(cursorHotScore, cursorId, size + 1);
+        boolean hasNext = ids.size() > size;
+        List<Long> pageIds = hasNext ? ids.subList(0, size) : ids;
+
+        if (pageIds.isEmpty()) {
+            return new CursorPageResponse<>(List.of(), null, false);
+        }
+
+        Map<Long, Note> noteMap = noteRepository.findByIdInWithAlcoholAndUser(pageIds).stream()
+                .collect(Collectors.toMap(Note::getId, Function.identity()));
+        List<Note> notes = pageIds.stream()
+                .map(noteMap::get)
+                .filter(Objects::nonNull)
+                .toList();
+
+        List<NoteResponse> content = toResponseList(notes);
+        String nextCursor = hasNext ? buildHotCursor(notes.get(notes.size() - 1)) : null;
+        return new CursorPageResponse<>(content, nextCursor, hasNext);
+    }
+
+    private String buildHotCursor(Note last) {
+        return CursorUtils.encode(Map.of(
+                "likeCount", String.valueOf(last.getLikeCount()),
+                "createdAt", last.getCreatedAt().toString(),
+                "id", String.valueOf(last.getId())));
+    }
+
+    private CursorPageResponse<NoteResponse> buildCursorResponse(
+            List<Note> notes, int size, Function<Note, String> cursorBuilder) {
+        boolean hasNext = notes.size() > size;
+        List<Note> page = hasNext ? notes.subList(0, size) : notes;
+        List<NoteResponse> content = toResponseList(page);
+        String nextCursor = hasNext ? cursorBuilder.apply(page.get(page.size() - 1)) : null;
+        return new CursorPageResponse<>(content, nextCursor, hasNext);
+    }
+
     @Transactional
     public NoteResponse updateNote(Long userId, Long noteId, NoteUpdateRequest request) {
         Note note = findNoteAndValidateOwner(noteId, userId);
@@ -117,7 +195,6 @@ public class NoteService {
         validateAlcoholInput(request.getAlcoholId(), request.getCustomAlcoholName());
 
         Alcohol alcohol = resolveAlcohol(request.getAlcoholId());
-
         note.update(
                 alcohol,
                 request.getCustomAlcoholName(),
@@ -135,7 +212,6 @@ public class NoteService {
         return toResponse(note);
     }
 
-    // 노트 이미지 교체
     @Transactional
     public NoteResponse updateImages(Long userId, Long noteId, List<MultipartFile> images) {
         Note note = findNoteAndValidateOwner(noteId, userId);
@@ -151,7 +227,6 @@ public class NoteService {
         return toResponse(note, savedImages);
     }
 
-    // 노트 발행
     @Transactional
     public NoteResponse publishNote(Long userId, Long noteId) {
         Note note = findNoteAndValidateOwner(noteId, userId);
@@ -159,11 +234,10 @@ public class NoteService {
         return toResponse(note);
     }
 
-    // 노트 삭제
     @Transactional
     public void deleteNote(Long userId, Long noteId) {
         Note note = findNoteAndValidateOwner(noteId, userId);
-        List<NoteImage> images = noteImageRepository.findAllByNoteId(noteId); // URL 확보 먼저
+        List<NoteImage> images = noteImageRepository.findAllByNoteId(noteId);
         deleteImagesFromS3(images);
         reportRepository.deleteAllByNoteId(noteId);
         noteImageRepository.deleteAllByNoteId(noteId);
@@ -186,7 +260,6 @@ public class NoteService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ALCOHOL_NOT_FOUND));
     }
 
-    // Note.builder() 공통 헬퍼
     private Note buildNote(User user, Alcohol alcohol, NoteBaseRequest request) {
         return Note.builder()
                 .user(user)
@@ -204,18 +277,25 @@ public class NoteService {
                 .build();
     }
 
-    // 읽기용 응답 헬퍼
     private NoteResponse toResponse(Note note) {
         List<NoteImage> images = noteImageRepository.findAllByNoteId(note.getId());
         return NoteResponse.from(note, images);
     }
 
-    // 쓰기 후 응답 헬퍼 — 이미지 리스트 재사용
     private NoteResponse toResponse(Note note, List<NoteImage> images) {
         return NoteResponse.from(note, images);
     }
 
-    // 노트 조회 + 소유자 검증 공통 헬퍼
+    private List<NoteResponse> toResponseList(List<Note> notes) {
+        if (notes.isEmpty()) return List.of();
+        List<Long> noteIds = notes.stream().map(Note::getId).toList();
+        Map<Long, List<NoteImage>> imageMap = noteImageRepository.findAllByNoteIdIn(noteIds)
+                .stream().collect(groupingBy(img -> img.getNote().getId()));
+        return notes.stream()
+                .map(n -> NoteResponse.from(n, imageMap.getOrDefault(n.getId(), List.of())))
+                .toList();
+    }
+
     private Note findNoteAndValidateOwner(Long noteId, Long userId) {
         Note note = noteRepository.findByIdWithAlcoholAndUser(noteId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOTE_NOT_FOUND));
@@ -225,7 +305,6 @@ public class NoteService {
         return note;
     }
 
-    // 이미지 S3 업로드 후 NoteImage 저장 — 저장된 리스트 반환 (DB 쿼리 절약)
     private List<NoteImage> saveImages(Note note, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) return List.of();
 
@@ -251,7 +330,6 @@ public class NoteService {
         }
     }
 
-    // S3에서 이미지 파일 삭제 헬퍼
     private void deleteImagesFromS3(List<NoteImage> images) {
         images.forEach(img -> {
             String url = img.getImageUrl();
@@ -259,5 +337,4 @@ public class NoteService {
             s3Port.delete(key);
         });
     }
-
 }

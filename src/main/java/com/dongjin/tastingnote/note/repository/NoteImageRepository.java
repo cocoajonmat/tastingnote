@@ -12,6 +12,8 @@ public interface NoteImageRepository extends JpaRepository<NoteImage, Long> {
 
     List<NoteImage> findAllByNoteId(Long noteId);
 
+    List<NoteImage> findAllByNoteIdIn(List<Long> noteIds);
+
     @Modifying(clearAutomatically = true)
     @Query("DELETE FROM NoteImage ni WHERE ni.note.id = :noteId")
     void deleteAllByNoteId(@Param("noteId") Long noteId);
