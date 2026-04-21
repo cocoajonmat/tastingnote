@@ -1,6 +1,8 @@
 package com.dongjin.tastingnote.note.controller;
 
 import com.dongjin.tastingnote.common.resolver.CurrentUserId;
+import com.dongjin.tastingnote.common.response.CursorPageResponse;
+import com.dongjin.tastingnote.common.response.OffsetPageResponse;
 import com.dongjin.tastingnote.note.dto.NoteCreateRequest;
 import com.dongjin.tastingnote.note.dto.NoteResponse;
 import com.dongjin.tastingnote.note.dto.NoteUpdateRequest;
@@ -46,23 +48,26 @@ public class NoteController {
         return ResponseEntity.ok(noteService.getNote(userId, noteId));
     }
 
-    @Operation(summary = "내 노트 목록 조회", description = "내 노트 전체 또는 상태별로 조회합니다. status 파라미터 없으면 전체 조회, DRAFT 또는 PUBLISHED로 필터링 가능합니다.")
+    @Operation(summary = "내 노트 목록 조회", description = "내 노트를 페이지 단위로 조회합니다. status 파라미터로 DRAFT/PUBLISHED 필터링 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/my")
-    public ResponseEntity<List<NoteResponse>> getMyNotes(
+    public ResponseEntity<OffsetPageResponse<NoteResponse>> getMyNotes(
             @CurrentUserId Long userId,
-            @RequestParam(required = false) NoteStatus status
+            @RequestParam(required = false) NoteStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        if (status != null) {
-            return ResponseEntity.ok(noteService.getMyNotesByStatus(userId, status));
-        }
-        return ResponseEntity.ok(noteService.getMyNotes(userId));
+        return ResponseEntity.ok(noteService.getMyNotesPaged(userId, status, page, size));
     }
 
-    @Operation(summary = "공개 노트 피드 조회", description = "모든 유저의 공개(isPublic=true, PUBLISHED) 노트를 조회합니다.")
+    @Operation(summary = "공개 노트 피드 조회", description = "공개 노트 피드를 커서 기반으로 조회합니다. sort: latest(기본), popular, hot")
     @GetMapping("/public")
-    public ResponseEntity<List<NoteResponse>> getPublicNotes() {
-        return ResponseEntity.ok(noteService.getPublicNotes());
+    public ResponseEntity<CursorPageResponse<NoteResponse>> getPublicNotes(
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return ResponseEntity.ok(noteService.getPublicNotesCursor(cursor, size, sort));
     }
 
     @Operation(summary = "노트 수정", description = "노트 내용을 수정합니다. 본인의 노트만 수정 가능합니다.")

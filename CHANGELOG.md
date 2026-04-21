@@ -6,7 +6,51 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
-## 2026-04-19 — AlcoholRequest 검증 강화 및 버그 7건 수정 (18회차 후속)
+## 2026-04-21 — 페이지네이션 구현 (커서/오프셋 혼용, 20회차)
+
+### Added
+- `CursorPageResponse<T>` record — `content`, `nextCursor`, `hasNext` 필드
+- `OffsetPageResponse<T>` record — `content`, `page`, `size`, `totalElements`, `totalPages`, `hasNext` 필드
+- `CursorUtils` — Base64 URL-safe 인코딩/디코딩 + `parseLongId()` 헬퍼 (null → Long.MAX_VALUE sentinel)
+- `Note.likeCount` 컬럼 추가 (`INT DEFAULT 0`, popular/hot 정렬용 비정규화)
+- `NoteRepository` 쿼리 4종 추가: `findPublicLatestByCursor`, `findPublicPopularByCursor`, `findPublicHotIdsByCursor`(native), `findByIdInWithAlcoholAndUser`, `findMyNotesPaged`, `findMyNotesPagedByStatus`
+- `NoteImageRepository.findAllByNoteIdIn()` — 이미지 일괄 조회 (N+1 방지)
+- `AlcoholRepository` 커서 쿼리 2종: `findByCategoryWithCursor`, `searchByKeywordWithCursor`
+- `NoteService.getPublicNotesCursor()` — latest/popular/hot 정렬 지원 커서 페이지네이션
+- `NoteService.getMyNotesPaged()` — 오프셋 페이지네이션 (status 필터 포함)
+- `NoteService.toResponseList()` — 이미지 일괄 조회로 목록 N+1 제거
+- hot sort: 2단계 조회 (native SQL로 ID → JPQL fetch join으로 엔티티)
+
+### Changed
+- `AlcoholService.search()` → 커서 기반으로 전환, LinkedHashSet 카테고리 머지 로직 제거
+- `AlcoholService.getByCategory()` → 커서 기반으로 전환
+- `NoteController.getPublicNotes()` → `sort`, `cursor`, `size` 파라미터 추가
+- `NoteController.getMyNotes()` → `page`, `size` 파라미터 추가, `OffsetPageResponse` 반환
+- `AlcoholController.search()` / `getByCategory()` → `cursor`, `size` 파라미터 추가, `CursorPageResponse` 반환
+
+---
+
+## 2026-04-19 — prod DB 정비 + 출시 준비 (19회차)
+
+### Added
+- 칵테일 15개 prod DB 직접 추가 (IBA 클래식 기준: Mojito, Negroni, Old Fashioned 등) + data.sql 반영
+
+### Changed
+- prod 테스트 데이터 전체 삭제 (alcohol 4개 + 연관 노트/신고)
+- data.sql prod 직접 실행 완료 (alcohol 186개 + alias 104개)
+- `Alcohol.name` / `nameKo` 컬럼 unique 제약 추가 (DB 정합성 보장)
+- `deploy.yml` AWS S3 환경변수 추가 (`AWS_S3_BUCKET`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+- Note taste/aroma: NoteFlavor 중간 테이블 → String 필드로 임시 전환 (출시 일정 이유)
+  - 이유: FlavorSuggestion 선택 목록 방식은 출시 후로 연기. 코드(NoteFlavor, FlavorSuggestion)는 유지
+- Note.alcohol nullable 전환 + `custom_alcohol_name` 컬럼 추가 (customAlcoholName 자유 텍스트 지원)
+  - alcoholId 없이도 노트 작성 가능 (AlcoholRequest 없이 바로 작성 가능, UX 개선)
+  - alcohol이 있으면 customAlcoholName null 강제, alcohol이 null이면 customAlcoholName 저장
+  - NoteBaseRequest: alcoholId optional, customAlcoholName(@Size max=100) 필드 추가
+  - NoteService: `validateAlcoholInput()` (둘 다 없으면 INVALID_INPUT 400), `resolveAlcohol()` 헬퍼 추가
+
+---
+
+## 2026-04-19 — AlcoholRequest 검증 강화 및 버그 7건 수정 (18회차)
 
 ### Fixed
 

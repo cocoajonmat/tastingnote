@@ -45,8 +45,8 @@
 ## 4. 피드 / 신고
 
 - [x]  [필수] 노트 신고 ✅ 백엔드 완료 (공개 노트만 신고 가능, OTHER 사유 시 설명 필수)
-- [ ]  [필수] 공개 피드 (좋아요 많은 순 / 최신순)
-- [ ]  [필수] 커서 페이지네이션 (무한 스크롤)
+- [x]  [필수] 공개 피드 (좋아요 많은 순 / 최신순) ✅ 백엔드 완료 (22회차 — latest/popular/hot 커서 페이지네이션)
+- [x]  [필수] 커서 페이지네이션 (무한 스크롤) ✅ 백엔드 완료 (22회차 — 공개 피드 커서, 내 노트 오프셋, 술 검색/카테고리 커서)
 
 ## 5. 공통 / 인프라
 
@@ -283,6 +283,16 @@
 >   - `GET /api/alcohols/{id}/stats` — 평균 별점 (노트 5개 이상 시 표시)
 >   - `GET /api/alcohols/{id}/flavors` — 맛/향 분포 (NoteFlavor GROUP BY)
 > - 친구와 최종 확인 후 진행
+
+---
+
+**Q18. Like 서비스 구현 시 likeCount 동기화 방법 ✅ 확정 (구현 보류)**
+> 페이지네이션 popular/hot 정렬을 위해 Note 엔티티에 `like_count` 컬럼 추가 (기본값 0, 22회차).
+> Like 서비스 미구현 상태라 현재는 모든 노트의 like_count = 0.
+> ✅ Like 서비스 구현 시 반드시 처리:
+> - 좋아요 누를 때: `note.likeCount++` (Note 업데이트)
+> - 좋아요 취소 시: `note.likeCount--` (Note 업데이트)
+> - Note 엔티티에 `incrementLikeCount()` / `decrementLikeCount()` 메서드 추가 권장
 
 ---
 

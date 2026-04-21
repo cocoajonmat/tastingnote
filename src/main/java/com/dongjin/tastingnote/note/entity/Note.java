@@ -63,6 +63,10 @@ public class Note extends BaseEntity {
 
     private String location;
 
+    @Column(name = "like_count", nullable = false)
+    @Builder.Default
+    private int likeCount = 0;
+
     // 노트 내용 수정
     public void update(Alcohol alcohol, String customAlcoholName, String title, String taste, String aroma, String pairing,
                        BigDecimal rating, String description, Boolean isPublic, LocalDate drankAt, String location) {
