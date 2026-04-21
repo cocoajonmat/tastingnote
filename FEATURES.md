@@ -286,6 +286,16 @@
 
 ---
 
+**Q18. Like 서비스 구현 시 likeCount 동기화 방법 ✅ 확정 (구현 보류)**
+> 페이지네이션 popular/hot 정렬을 위해 Note 엔티티에 `like_count` 컬럼 추가 (기본값 0, 22회차).
+> Like 서비스 미구현 상태라 현재는 모든 노트의 like_count = 0.
+> ✅ Like 서비스 구현 시 반드시 처리:
+> - 좋아요 누를 때: `note.likeCount++` (Note 업데이트)
+> - 좋아요 취소 시: `note.likeCount--` (Note 업데이트)
+> - Note 엔티티에 `incrementLikeCount()` / `decrementLikeCount()` 메서드 추가 권장
+
+---
+
 **Q17. 닉네임 변경을 허용할 건지, 허용한다면 제한은?**
 > 현재 설계에 닉네임 변경 정책 없음.
 > 프로필 URL 방식과 연결된 문제 — 닉네임 기반 URL(/profile/동진)이면 변경 시 링크 깨짐.
