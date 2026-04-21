@@ -54,7 +54,7 @@
     - Discovery 기능(Q3)과도 연결됨
 
 ### Note
-- alcohol 필드 (@ManyToOne, nullable) — alcoholId 또는 customAlcoholName 중 하나 필수 (21회차, 2026-04-19)
+- alcohol 필드 (@ManyToOne, nullable) — alcoholId 또는 customAlcoholName 중 하나 필수 (19회차, 2026-04-19)
 - customAlcoholName 필드 추가 (String, nullable) — DB에 없는 술을 자유 텍스트로 노트 작성 허용
   - alcohol이 있으면 customAlcoholName은 null로 강제. alcohol이 null이면 customAlcoholName 저장
   - AlcoholRequest 없이도 바로 노트 작성 가능 (UX 개선)
@@ -62,7 +62,7 @@
 - ~~alcoholName 자유입력 제거 — 엄격한 방식으로 변경 확정 (2026-04-09)~~ → 21회차에 customAlcoholName으로 재도입
 - title → 필수
 - rating → 필수, 5점 만점 (0.5~5.0, 0.5단위) — DECIMAL(2,1), Java 타입 BigDecimal (11회차에 Double → BigDecimal 전환)
-- taste, aroma → **출시 전 자유 텍스트로 임시 전환 (20회차, 2026-04-19)** — Note 엔티티에 String 필드로 저장
+- taste, aroma → **출시 전 자유 텍스트로 임시 전환 (19회차, 2026-04-19)** — Note 엔티티에 String 필드로 저장
   - 이유: 출시 일정으로 인해 임시 자유텍스트 방식 채택. NoteFlavor 중간 테이블/FlavorSuggestion은 코드에 유지
   - **출시 후 Vivino 방식으로 재전환 예정** — FlavorSuggestion 선택 목록 + NoteFlavor 중간 테이블
 - pairing, description → 자유 텍스트
@@ -271,7 +271,16 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
-- customAlcoholName 자유 텍스트 지원 (21회차, 2026-04-19)
+- 페이지네이션 구현 (20회차, 2026-04-21, feature/pagination)
+  - CursorPageResponse / OffsetPageResponse 공통 래퍼
+  - CursorUtils: Base64 URL-safe 커서 인코딩/디코딩, parseLongId() 헬퍼
+  - Note.likeCount 컬럼 추가 (popular/hot 정렬용 비정규화)
+  - 공개 피드 커서 페이지네이션 (latest/popular/hot 3종 정렬)
+  - 내 노트 오프셋 페이지네이션 (status 필터 포함)
+  - 술 검색/카테고리 커서 페이지네이션
+  - 이미지 N+1 제거: findAllByNoteIdIn() 일괄 조회
+  - hot: native SQL 2단계 조회 (TIMESTAMPDIFF MySQL 전용)
+- customAlcoholName 자유 텍스트 지원 (19회차, 2026-04-19)
   - Note.alcohol nullable 전환 + `custom_alcohol_name` 컬럼 추가
   - NoteBaseRequest: alcoholId optional, customAlcoholName(@Size max=100) 필드 추가
   - NoteService: `validateAlcoholInput()` (둘 다 없으면 INVALID_INPUT 400), `resolveAlcohol()` 추가
@@ -470,6 +479,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
+> **현재 브랜치: `feature/pagination`** — PR 전 prod 배포 후 hot sort 테스트 필요
 
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
