@@ -6,6 +6,35 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-04-23 — 소셜 로그인(OAuth2) 구현 (21회차)
+
+### Added
+- `Provider` enum에 `NAVER` 추가
+- `UserRepository`: `findByProviderAndProviderId(Provider, String)` 추가
+- `ErrorCode`: `SOCIAL_EMAIL_CONFLICT`(409), `SOCIAL_EMAIL_REQUIRED`(400), `UNSUPPORTED_PROVIDER`(400) 추가
+- `OAuthClient` 인터페이스: `provider()` + `fetchUserInfo(code, redirectUri)` (S3Port 패턴과 동일)
+- `AbstractOAuthClient` 추상 클래스: `fetchAccessToken(tokenUrl, clientId, clientSecret, code, redirectUri)` + `fetchUserInfoMap(userInfoUrl, accessToken)` 공통 로직 추출 — 3개 구현체에서 중복 45줄 제거
+- `KakaoOAuthClient`: 카카오 토큰/유저정보 API 호출 (kakao_account.email, profile 파싱)
+- `GoogleOAuthClient`: 구글 토큰/유저정보 API 호출 (id, email, name, picture)
+- `NaverOAuthClient`: 네이버 토큰/유저정보 API 호출 (response.id, email, nickname, profile_image)
+- `OAuthLoginRequest` record: `code`, `redirectUri` (@NotBlank)
+- `OAuthLoginResponse` record: `accessToken`, `refreshToken`, `isNewUser`
+- `OAuthUserInfo` record: `providerId`, `email`, `nickname`, `profileImageUrl`, `provider`
+- `OAuthService`: List<OAuthClient> → Map<Provider, OAuthClient> 자동 매핑, 기존 유저 로그인/신규 가입/이메일 충돌(409)/임시 닉네임 자동생성 처리
+- `OAuthController`: `POST /api/auth/oauth/{provider}` (SecurityConfig `/api/auth/**` permitAll 기존 적용으로 추가 설정 불필요)
+- `application.yaml`: oauth.kakao/google/naver 클라이언트 설정 블록 추가
+- `deploy.yml`: 소셜 OAuth 환경변수 6개 추가 (`KAKAO/GOOGLE/NAVER_CLIENT_ID`, `KAKAO/GOOGLE/NAVER_CLIENT_SECRET`)
+
+### 설계 결정
+- **플로우**: 프론트가 code 획득 → `POST /api/auth/oauth/{provider}` → JWT 반환 (클라이언트 사이드 방식)
+  - 이유: 서버 사이드 리다이렉트는 state 검증에 세션이 필요한데, 현재 아키텍처가 JWT Stateless라 구조적 충돌
+- **신규 가입 임시 닉네임**: `kakao_xxxxxxxx` (provider 소문자 + UUID 8자리), 중복 시 최대 3회 재생성
+- **이메일 충돌**: 동일 이메일로 LOCAL 계정이 이미 존재하면 409 에러 반환 (소셜 로그인 불허)
+- **이메일 미동의(카카오)**: email null이면 `SOCIAL_EMAIL_REQUIRED` 에러 — 카카오 개발자 콘솔에서 이메일 필수 동의 설정 필요
+- **AbstractOAuthClient**: OAuthClient 인터페이스는 유지하고 추상 클래스가 HTTP 통신 공통 로직을 담는 Template Method 패턴
+
+---
+
 ## 2026-04-21 — 페이지네이션 구현 (커서/오프셋 혼용, 20회차)
 
 ### Added
