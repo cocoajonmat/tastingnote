@@ -3,21 +3,13 @@ package com.dongjin.tastingnote.oauth.client;
 import com.dongjin.tastingnote.oauth.dto.OAuthUserInfo;
 import com.dongjin.tastingnote.user.entity.Provider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
 @Component
-public class KakaoOAuthClient implements OAuthClient {
-
-    private final RestTemplate restTemplate;
+public class KakaoOAuthClient extends AbstractOAuthClient {
 
     @Value("${oauth.kakao.client-id}")
     private String clientId;
@@ -26,7 +18,7 @@ public class KakaoOAuthClient implements OAuthClient {
     private String clientSecret;
 
     public KakaoOAuthClient(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+        super(restTemplate);
     }
 
     @Override
@@ -36,40 +28,14 @@ public class KakaoOAuthClient implements OAuthClient {
 
     @Override
     public OAuthUserInfo fetchUserInfo(String code, String redirectUri) {
-        String accessToken = getAccessToken(code, redirectUri);
-        return getUserInfo(accessToken);
-    }
-
-    private String getAccessToken(String code, String redirectUri) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("grant_type", "authorization_code");
-        body.add("client_id", clientId);
-        body.add("client_secret", clientSecret);
-        body.add("redirect_uri", redirectUri);
-        body.add("code", code);
-
-        Map<?, ?> response = restTemplate.postForObject(
-                "https://kauth.kakao.com/oauth/token",
-                new HttpEntity<>(body, headers),
-                Map.class
-        );
-        return (String) response.get("access_token");
+        String accessToken = fetchAccessToken(
+                "https://kauth.kakao.com/oauth/token", clientId, clientSecret, code, redirectUri);
+        return parseUserInfo(accessToken);
     }
 
     @SuppressWarnings("unchecked")
-    private OAuthUserInfo getUserInfo(String accessToken) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(accessToken);
-
-        Map<?, ?> response = restTemplate.exchange(
-                "https://kapi.kakao.com/v2/user/me",
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                Map.class
-        ).getBody();
+    private OAuthUserInfo parseUserInfo(String accessToken) {
+        Map<?, ?> response = fetchUserInfoMap("https://kapi.kakao.com/v2/user/me", accessToken);
 
         String providerId = String.valueOf(response.get("id"));
         Map<String, Object> kakaoAccount = (Map<String, Object>) response.get("kakao_account");
