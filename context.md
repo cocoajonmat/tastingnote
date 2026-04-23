@@ -485,7 +485,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
-> **현재 브랜치: `feature/oauth`** — PR 전 각 소셜 개발자 콘솔 앱 등록 + GitHub Secrets 설정 필요
+> **현재 브랜치: `feature/oauth`** — PR 대기 중 (카카오/네이버/구글 앱 등록 완료, GitHub Secrets 6개 등록 완료)
 
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
