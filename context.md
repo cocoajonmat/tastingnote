@@ -271,6 +271,12 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ## 구현 현황
 
 ### 완료
+- 소셜 로그인 OAuth2 구현 (21회차, 2026-04-23, feature/oauth)
+  - OAuthClient 인터페이스 + AbstractOAuthClient 추상 클래스 (Template Method 패턴)
+  - KakaoOAuthClient / GoogleOAuthClient / NaverOAuthClient
+  - OAuthService: 기존 유저 로그인 / 신규 가입 / 이메일 충돌(409) / 임시 닉네임 자동생성
+  - OAuthController: POST /api/auth/oauth/{provider}
+  - Provider.NAVER 추가, ErrorCode 3개 추가, deploy.yml 환경변수 6개 추가
 - 페이지네이션 구현 (20회차, 2026-04-21, feature/pagination)
   - CursorPageResponse / OffsetPageResponse 공통 래퍼
   - CursorUtils: Base64 URL-safe 커서 인코딩/디코딩, parseLongId() 헬퍼
@@ -479,7 +485,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
-> **현재 브랜치: `feature/pagination`** — PR 전 prod 배포 후 hot sort 테스트 필요
+> **현재 브랜치: `feature/oauth`** — PR 대기 중 (카카오/네이버/구글 앱 등록 완료, GitHub Secrets 6개 등록 완료)
 
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
@@ -559,8 +565,9 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 5-1. ~~**AlcoholRequest v2 리팩터링**~~ ✅ 완료 (18회차, 2026-04-19)
 
-6. **소셜 로그인 (OAuth2)** → 완료 후 출시 ← 다음 작업
-   - 카카오 / 구글 / 네이버
+6. ~~**소셜 로그인 (OAuth2)**~~ ✅ 완료 (21회차, 2026-04-23, feature/oauth)
+   - 카카오 / 구글 / 네이버 클라이언트 사이드 방식 구현 완료
+   - 개발자 콘솔 앱 등록 + GitHub Secrets 등록 필요 (코드 외 작업)
 
 7. **[출시 직전] Flyway 도입 + ddl-auto: validate 전환**
    - 소셜 로그인까지 완료 후 엔티티가 안정된 시점에 진행

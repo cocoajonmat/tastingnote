@@ -43,7 +43,12 @@ public enum ErrorCode {
     // 400 Bad Request - Image
     IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "IMAGE_LIMIT_EXCEEDED", "이미지는 최대 3장까지 업로드할 수 있습니다"),
     INVALID_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_TYPE", "이미지 파일만 업로드할 수 있습니다"),
-    PROFILE_IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "PROFILE_IMAGE_TOO_LARGE", "프로필 이미지는 20MB 이하만 업로드할 수 있습니다");
+    PROFILE_IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "PROFILE_IMAGE_TOO_LARGE", "프로필 이미지는 20MB 이하만 업로드할 수 있습니다"),
+
+    // 소셜 로그인
+    SOCIAL_EMAIL_CONFLICT(HttpStatus.CONFLICT, "S009", "이미 이메일/비밀번호로 가입된 계정입니다. 일반 로그인을 이용해주세요."),
+    SOCIAL_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "S010", "이메일 제공에 동의해주세요."),
+    UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "S011", "지원하지 않는 소셜 로그인 방식입니다.");
 
     private final HttpStatus status;
     private final String code;
