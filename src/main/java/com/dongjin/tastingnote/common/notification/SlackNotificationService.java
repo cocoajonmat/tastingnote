@@ -48,6 +48,7 @@ public class SlackNotificationService implements NotificationPort {
         sb.append(String.format("• 시각: %s\n", time));
         sb.append(String.format("• 메서드: %s\n", request.getMethod()));
         sb.append(String.format("• URL: %s\n", request.getRequestURI()));
+        sb.append(String.format("• IP: %s\n", getClientIp(request)));
         sb.append(String.format("• 에러: %s\n", e.getClass().getSimpleName()));
         sb.append(String.format("• 메시지: %s", e.getMessage()));
 
@@ -89,6 +90,18 @@ public class SlackNotificationService implements NotificationPort {
         );
 
         send(feedbackWebhookUrl, message);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp;
+        }
+        return request.getRemoteAddr();
     }
 
     private String formatStackTrace(Exception e) {
