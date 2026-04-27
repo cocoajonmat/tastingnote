@@ -5,9 +5,6 @@
 다음 파일들을 **Read 툴로 직접** 읽으세요. 서브에이전트(Agent 툴) 사용 금지.
 
 - `context.md` — 현재 진행 상황, 브랜치, 다음 할 일
-- `CHANGELOG.md` — 최근 변경 이력 (마지막 2~3개 섹션만)
-- `FEATURES.md` — 전체 기능 구현 현황
-- `LEARNING.md` — 지금까지 배운 개념 목록
 - `COLLABORATION.md` — 협업 방식 및 규칙
 
 memory 파일들도 읽으세요:
@@ -66,7 +63,7 @@ git diff --name-only HEAD~3 HEAD
 - stash: 있음/없음
 
 ## ⏭️ 오늘 할 일 제안
-context.md와 FEATURES.md를 보고 자연스러운 다음 작업 2~3개 제안
+context.md를 보고 자연스러운 다음 작업 2~3개 제안
 
 ## 💡 참고 사항
 (놓치기 쉬운 것, 이전 세션에서 보류된 결정, 주의할 의존성 등 있으면 기재)
