@@ -23,4 +23,6 @@ public class NoteImage extends BaseEntity {
 
     @Column(name = "image_url", nullable = false)
     private String imageUrl;
+
+    private String s3Key;
 }

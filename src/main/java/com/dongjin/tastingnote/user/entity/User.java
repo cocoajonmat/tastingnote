@@ -33,6 +33,8 @@ public class User extends BaseEntity {
     @Column(name = "profile_image_url")
     private String profileImageUrl;
 
+    private String profileImageS3Key;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Provider provider;
@@ -56,7 +58,8 @@ public class User extends BaseEntity {
         this.password = encodedPassword;
     }
 
-    public void updateProfileImageUrl(String profileImageUrl) {
+    public void updateProfileImageUrl(String profileImageUrl, String profileImageS3Key) {
         this.profileImageUrl = profileImageUrl;
+        this.profileImageS3Key = profileImageS3Key;
     }
 }

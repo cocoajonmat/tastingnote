@@ -9,6 +9,7 @@ import com.dongjin.tastingnote.user.entity.Provider;
 import com.dongjin.tastingnote.user.entity.User;
 import com.dongjin.tastingnote.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,13 +44,27 @@ public class UserService {
                 .provider(Provider.LOCAL)
                 .build();
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            if (userRepository.existsByEmail(email)) {
+                throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+            if (userRepository.existsByNicknameAndDeletedAtIsNull(request.getNickname())) {
+                throw new BusinessException(ErrorCode.NICKNAME_ALREADY_EXISTS);
+            }
+            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
     }
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
         User user = userRepository.findByEmailAndDeletedAtIsNull(request.getEmail().toLowerCase())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_LOGIN));
+
+        if (user.getProvider() != Provider.LOCAL) {
+            throw new BusinessException(ErrorCode.SOCIAL_LOGIN_REQUIRED, user.getProvider().getDescription() + " 로그인을 이용해주세요.");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new BusinessException(ErrorCode.INVALID_LOGIN);
@@ -126,20 +141,15 @@ public class UserService {
             throw new BusinessException(ErrorCode.PROFILE_IMAGE_TOO_LARGE);
         }
 
-        // todo: S3 key를 DB에 별도 저장하도록 개선 필요 (현재는 URL에서 역추출)
         if (user.getProfileImageUrl() != null) {
-            String oldKey = extractS3Key(user.getProfileImageUrl());
+            String oldKey = user.getProfileImageS3Key();
             s3Port.delete(oldKey);
         }
 
         String key = "profile/" + userId + "/" + UUID.randomUUID();
         String imageUrl = s3Port.upload(file, key);
-        user.updateProfileImageUrl(imageUrl);
+        user.updateProfileImageUrl(imageUrl, key);
         return new ProfileImageResponse(imageUrl);
-    }
-
-    private String extractS3Key(String url) {
-        return url.substring(url.indexOf(".com/") + 5);
     }
 
     private TokenResponse issueTokens(User user) {

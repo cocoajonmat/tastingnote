@@ -48,7 +48,9 @@ public enum ErrorCode {
     // 소셜 로그인
     SOCIAL_EMAIL_CONFLICT(HttpStatus.CONFLICT, "S009", "이미 이메일/비밀번호로 가입된 계정입니다. 일반 로그인을 이용해주세요."),
     SOCIAL_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "S010", "이메일 제공에 동의해주세요."),
-    UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "S011", "지원하지 않는 소셜 로그인 방식입니다.");
+    UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "S011", "지원하지 않는 소셜 로그인 방식입니다."),
+    SOCIAL_LOGIN_REQUIRED(HttpStatus.UNAUTHORIZED, "SOCIAL_LOGIN_REQUIRED", "소셜 로그인으로 가입된 계정입니다.");
+
 
     private final HttpStatus status;
     private final String code;

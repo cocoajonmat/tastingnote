@@ -238,12 +238,12 @@ public class NoteService {
     public void deleteNote(Long userId, Long noteId) {
         Note note = findNoteAndValidateOwner(noteId, userId);
         List<NoteImage> images = noteImageRepository.findAllByNoteId(noteId);
-        deleteImagesFromS3(images);
         reportRepository.deleteAllByNoteId(noteId);
         noteImageRepository.deleteAllByNoteId(noteId);
         noteFlavorRepository.deleteAllByNoteId(noteId);
         noteTagRepository.deleteAllByNoteId(noteId);
         noteRepository.delete(note);
+        deleteImagesFromS3(images);
     }
 
     private void validateAlcoholInput(Long alcoholId, String customAlcoholName) {
@@ -318,7 +318,7 @@ public class NoteService {
                     .orElse("jpg");
             String key = "notes/" + note.getId() + "/" + UUID.randomUUID() + "." + ext;
             String url = s3Port.upload(file, key);
-            noteImages.add(NoteImage.builder().note(note).imageUrl(url).build());
+            noteImages.add(NoteImage.builder().note(note).imageUrl(url).s3Key(key).build());
         }
         return noteImageRepository.saveAll(noteImages);
     }
@@ -332,9 +332,7 @@ public class NoteService {
 
     private void deleteImagesFromS3(List<NoteImage> images) {
         images.forEach(img -> {
-            String url = img.getImageUrl();
-            String key = url.substring(url.indexOf(".amazonaws.com/") + ".amazonaws.com/".length());
-            s3Port.delete(key);
+            if (img.getS3Key() != null) s3Port.delete(img.getS3Key());
         });
     }
 }
