@@ -29,7 +29,7 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         notificationPort.sendError(e, request, errorCode.getStatus());
         return ResponseEntity.status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode));
+                .body(ErrorResponse.of(errorCode, e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
