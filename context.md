@@ -577,6 +577,17 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 ---
 > **출시 후 구현 예정**
 
+## 네비게이션 구조 (출시 후)
+```
+홈 | 내 노트 | 내 취향 | 프로필
+              ↓
+         내 취향 페이지
+           ├─ 바텐더 취향 카드
+           ├─ 술 순위
+           └─ (2단계) AI 추천
+```
+- 프로필은 나만 보는 페이지 → 취향 카드와 결이 달라 별도 메뉴 분리
+
 8. 술 상세 페이지 API (GET /api/alcohols/{id}/notes|stats|flavors)
    - 친구와 최종 확인 후 진행
 
@@ -590,6 +601,28 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
     - Tag, Like, 피드 API 완성 후 N+1 문제 해결 (@EntityGraph 적용)
 
 11. ~~RefreshToken 정리 스케줄러~~ — 12회차에서 RT Stateless 전환으로 불필요해짐
+
+---
+> **출시 후 로드맵 (23회차 기획, 2026-05-16)**
+
+12. [1단계] 내 취향 페이지 — 약 1.5일
+    - 바텐더 취향 카드 — 반나절
+      - 별점 구간별 카테고리 (5점대: 최애 / 4점대: 좋음 / 3점대: 무난 / 이하: 별로)
+      - QR/링크 없이 폰 화면 직접 보여주는 방식
+      - API: GET /api/users/me/taste-card
+    - 개인 술 순위 — 반나절~1일
+      - 별점 기반 자동 정렬 (수동 드래그 없음, 기존 정렬 파라미터 추가)
+    - 내 취향 페이지는 별도 네비게이션 메뉴로 분리
+
+13. [2단계] LLM 추천 시스템 — 약 7~8일 (출시 후 1~2달 뒤, 데이터 쌓인 후 시작)
+    - LLM: Gemini 2.0 Flash (무료 티어 1M 토큰/일, Google 공식 Java SDK)
+    - Phase 1. 행동 데이터 수집 (UserEvent 엔티티, AOP 자동 기록) — 1.5일
+      - 수집: 별점/노트/좋아요 + 술 상세 클릭 + 검색어 + 맛/향 태그 (체류시간 제외)
+    - Phase 2. 사용자 프로파일 빌더 (이벤트 집계 → 취향 점수화, 스케줄러) — 1일
+    - Phase 3. 온보딩 취향 선택 (POST /api/users/me/onboarding) — 0.5일
+      - Cold Start 해결: 술 종류 + 선호 맛 4~6개 선택
+    - Phase 4. Gemini API 연동 (프롬프트 설계/튜닝, 24h 캐시) — 1.5일
+    - Phase 5. 추천 API (GET /api/recommendations) — 0.5일
 
 ---
 
