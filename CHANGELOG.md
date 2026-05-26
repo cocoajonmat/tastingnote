@@ -6,6 +6,28 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-05-26 — LLM 추천 시스템 Phase 1: 행동 데이터 수집 (25회차)
+
+### Added
+- `UserEventType` enum — NOTE_CREATED / NOTE_RATED / SEARCH / VIEW_ALCOHOL / VIEW_NOTE
+- `UserEvent` 엔티티 — userId, eventType, metadata(JSON TEXT), createdAt
+- `UserEventRepository` — JpaRepository 기본 구현
+- `UserEventAspect` — AOP 기반 이벤트 자동 기록
+  - 술 검색(`AlcoholService.search`) → SEARCH 이벤트
+  - 술 상세 조회(`AlcoholController.getById`) → VIEW_ALCOHOL 이벤트 (Controller 감지로 내부 호출 오탐 방지)
+  - 노트 단건 조회(`NoteService.getNote`) → VIEW_NOTE 이벤트
+  - 노트 작성(`NoteService.createNote`) → NOTE_CREATED + NOTE_RATED 이벤트 동시 기록
+- `build.gradle.kts` — `spring-boot-starter-aop` 의존성 추가
+
+### 설계 결정
+- **metadata 컬럼 JSON TEXT 방식 채택** — 이벤트마다 추가 정보가 달라 컬럼 분리 시 null이 많아짐. Phase 2에서 데이터를 유저별 전체 조회 후 AI에 넘기는 방식이라 개별 필드 쿼리가 불필요해 JSON TEXT가 더 적합
+- **Service가 아닌 Controller 감지** — `AlcoholService.getById()`는 노트 작성 시 내부에서도 호출되므로 Service를 감지하면 VIEW_ALCOHOL 오탐 발생. Controller를 감지해 유저 직접 요청만 기록
+- **이벤트 저장 실패 방어** — try-catch로 감싸 이벤트 저장 실패가 원래 API 응답에 영향을 주지 않도록 처리
+- **비로그인 유저 제외** — SecurityContextHolder에서 userId null이면 기록 안 함
+- **Like 이벤트 제외** — Like 기능 미구현 상태. 구현 후 LIKE_NOTE 이벤트 타입 추가 예정
+
+---
+
 ## 2026-04-23 — 소셜 로그인(OAuth2) 구현 (21회차)
 
 ### Added

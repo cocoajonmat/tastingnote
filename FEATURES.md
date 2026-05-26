@@ -79,7 +79,7 @@
 > **LLM: Gemini 2.0 Flash** (무료 티어 — 1M 토큰/일, Google 공식 Java SDK)
 > 데이터가 어느 정도 쌓인 후 시작해야 추천 품질이 의미 있음
 
-- [ ]  [추가] Phase 1. 행동 데이터 수집 — 1.5일
+- [x]  [추가] Phase 1. 행동 데이터 수집 ✅ 백엔드 완료 (25회차 — UserEvent 엔티티, AOP 자동 기록, NOTE_CREATED/NOTE_RATED/SEARCH/VIEW_ALCOHOL/VIEW_NOTE)
   - `UserEvent` 엔티티 (event_type: VIEW_ALCOHOL, SEARCH, NOTE_CREATED 등)
   - AOP로 기존 API에 이벤트 자동 기록
   - 수집 범위: 별점/노트/좋아요 + 술 상세 클릭 + 검색어 + 맛/향 태그 (체류시간 제외)

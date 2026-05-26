@@ -101,6 +101,46 @@ Map<Long, List<NoteImage>> imageMap = noteImageRepository.findAllByNoteIdIn(note
 
 ---
 
+## AOP (Aspect-Oriented Programming) — 25회차
+
+**왜 필요한가**: 이벤트 기록처럼 핵심 비즈니스 로직이 아닌 부가 기능을 각 메서드에 직접 삽입하면 책임이 섞이고 유지보수가 어려워진다.  
+AOP는 부가 기능을 별도 클래스(Aspect)로 분리해서, 원래 코드는 건드리지 않고 "이 메서드가 호출되면 자동으로 실행"하도록 설정한다.
+
+**비유**: 주방장(API)은 요리만 하고, 기록원(AOP)이 옆에서 보다가 장부(UserEvent)에 자동으로 기록.
+
+**핵심 어노테이션**:
+- `@Aspect` — 이 클래스가 AOP 기록원임을 선언
+- `@AfterReturning` — 대상 메서드가 성공적으로 끝난 후 실행 (실패 시 실행 안 함)
+- `execution(* com.dongjin.tastingnote.alcohol.controller.AlcoholController.getById(..))` — 어떤 메서드를 감지할지 지정하는 표현식 (Pointcut)
+
+**Service vs Controller 감지**:  
+`AlcoholService.getById()`는 내부에서도 호출(노트 작성 시 술 정보 조회)되므로 Service를 감지하면 오탐이 생긴다.  
+`AlcoholController.getById()`를 감지하면 유저가 직접 요청한 경우에만 이벤트가 기록된다.
+
+**이벤트 저장 실패 방어**: 이벤트 기록은 부가 기능이므로 저장 실패가 원래 API 응답에 영향을 주면 안 된다. try-catch로 감싸고 로그만 남긴다.
+
+---
+
+## SecurityContextHolder에서 userId 꺼내기 — 25회차
+
+JWT 필터(`JwtAuthenticationFilter`)가 토큰을 검증한 뒤 userId를 `SecurityContextHolder`에 저장한다.
+
+```java
+// 저장 (JwtAuthenticationFilter)
+UsernamePasswordAuthenticationToken authentication =
+    new UsernamePasswordAuthenticationToken(userId, null, authorities);
+SecurityContextHolder.getContext().setAuthentication(authentication);
+
+// 꺼내기 (AOP 또는 ArgumentResolver)
+Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+Long userId = (Long) auth.getPrincipal();
+```
+
+`getPrincipal()`의 반환 타입이 Object이므로 Long으로 캐스팅해야 한다.  
+비로그인 요청은 `auth == null` 또는 `principal`이 Long이 아니므로 null 체크 필수.
+
+---
+
 ## 크로스 필드 중복 검증 — 18회차
 
 name과 nameKo가 서로를 체크해야 하는 경우가 있다.
