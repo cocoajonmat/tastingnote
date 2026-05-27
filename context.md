@@ -197,6 +197,10 @@ com.dongjin.tastingnote
 ├── report/service/ReportService.java
 ├── report/controller/ReportController.java
 ├── report/dto/ReportRequest.java
+├── event/entity/UserEventType.java       ← 25회차 신설
+├── event/entity/UserEvent.java           ← 25회차 신설
+├── event/repository/UserEventRepository.java ← 25회차 신설
+├── event/aop/UserEventAspect.java        ← 25회차 신설
 ├── feedback/entity/Feedback.java        ← 12회차 신설
 ├── feedback/entity/FeedbackCategory.java
 ├── feedback/entity/FeedbackStatus.java
@@ -485,7 +489,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
-> **현재 브랜치: `feature/oauth`** — PR 대기 중 (카카오/네이버/구글 앱 등록 완료, GitHub Secrets 6개 등록 완료)
+> **현재 브랜치: `feature/user-event`** — Phase 1 구현 완료, PR 대기 중
 
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
@@ -604,6 +608,13 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ---
 > **출시 후 로드맵 (23회차 기획, 2026-05-16)**
+
+11-1. ~~**LLM 추천 Phase 1: 행동 데이터 수집**~~ ✅ 완료 (25회차, 2026-05-26, feature/user-event)
+    - UserEvent 엔티티 (userId, eventType, metadata JSON, createdAt)
+    - UserEventType: NOTE_CREATED / NOTE_RATED / SEARCH / VIEW_ALCOHOL / VIEW_NOTE
+    - AOP(UserEventAspect)로 기존 API 코드 수정 없이 자동 기록
+    - 비로그인 유저 제외, 이벤트 저장 실패 시 API 영향 없음
+    - Like 이벤트(LIKE_NOTE)는 Like 기능 구현 후 추가 예정
 
 12. [1단계] 내 취향 페이지 — 약 1.5일
     - 바텐더 취향 카드 — 반나절
