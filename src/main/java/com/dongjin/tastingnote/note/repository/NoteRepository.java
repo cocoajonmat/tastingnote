@@ -68,4 +68,24 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
             @Param("userId") Long userId,
             @Param("status") NoteStatus status,
             Pageable pageable);
+
+    // ── 내 노트 Offset (전체, 별점 내림차순) ──────────────────────────────
+    @Query(value = "SELECT n FROM Note n LEFT JOIN FETCH n.alcohol JOIN FETCH n.user " +
+                   "WHERE n.user.id = :userId ORDER BY n.rating DESC, n.id DESC",
+           countQuery = "SELECT COUNT(n) FROM Note n WHERE n.user.id = :userId")
+    Page<Note> findMyNotesPagedOrderByRating(@Param("userId") Long userId, Pageable pageable);
+
+    // ── 내 노트 Offset (상태 필터, 별점 내림차순) ─────────────────────────
+    @Query(value = "SELECT n FROM Note n LEFT JOIN FETCH n.alcohol JOIN FETCH n.user " +
+                   "WHERE n.user.id = :userId AND n.status = :status ORDER BY n.rating DESC, n.id DESC",
+           countQuery = "SELECT COUNT(n) FROM Note n WHERE n.user.id = :userId AND n.status = :status")
+    Page<Note> findMyNotesPagedByStatusOrderByRating(
+            @Param("userId") Long userId,
+            @Param("status") NoteStatus status,
+            Pageable pageable);
+
+    // ── 취향 카드 (PUBLISHED 노트, alcohol만 fetch) ───────────────────────
+    @Query("SELECT n FROM Note n LEFT JOIN FETCH n.alcohol " +
+           "WHERE n.user.id = :userId AND n.status = 'PUBLISHED'")
+    List<Note> findPublishedNotesForTasteCard(@Param("userId") Long userId);
 }

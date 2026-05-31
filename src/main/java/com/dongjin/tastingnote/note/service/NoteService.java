@@ -92,11 +92,14 @@ public class NoteService {
         return toResponse(note);
     }
 
-    public OffsetPageResponse<NoteResponse> getMyNotesPaged(Long userId, NoteStatus status, int page, int size) {
+    public OffsetPageResponse<NoteResponse> getMyNotesPaged(Long userId, NoteStatus status, String sort, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
-        Page<Note> notePage = status != null
-                ? noteRepository.findMyNotesPagedByStatus(userId, status, pageable)
-                : noteRepository.findMyNotesPaged(userId, pageable);
+        boolean byRating = "rating".equals(sort);
+        Page<Note> notePage = (status != null)
+                ? (byRating ? noteRepository.findMyNotesPagedByStatusOrderByRating(userId, status, pageable)
+                            : noteRepository.findMyNotesPagedByStatus(userId, status, pageable))
+                : (byRating ? noteRepository.findMyNotesPagedOrderByRating(userId, pageable)
+                            : noteRepository.findMyNotesPaged(userId, pageable));
 
         List<NoteResponse> content = toResponseList(notePage.getContent());
         return new OffsetPageResponse<>(
