@@ -48,17 +48,16 @@ public class NoteController {
         return ResponseEntity.ok(noteService.getNote(userId, noteId));
     }
 
-    @Operation(summary = "내 노트 목록 조회", description = "내 노트를 페이지 단위로 조회합니다. status 파라미터로 DRAFT/PUBLISHED 필터링, sort=rating으로 별점 내림차순 정렬 가능합니다.")
+    @Operation(summary = "내 노트 목록 조회", description = "내 노트를 페이지 단위로 조회합니다. status 파라미터로 DRAFT/PUBLISHED 필터링 가능합니다.")
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/my")
     public ResponseEntity<OffsetPageResponse<NoteResponse>> getMyNotes(
             @CurrentUserId Long userId,
             @RequestParam(required = false) NoteStatus status,
-            @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ResponseEntity.ok(noteService.getMyNotesPaged(userId, status, sort, page, size));
+        return ResponseEntity.ok(noteService.getMyNotesPaged(userId, status, page, size));
     }
 
     @Operation(summary = "공개 노트 피드 조회", description = "공개 노트 피드를 커서 기반으로 조회합니다. sort: latest(기본), popular, hot")

@@ -5,6 +5,35 @@ Claude Code가 새로운 클래스/기능을 만들 때마다 여기에 설명�
 
 ---
 
+## Collectors.groupingBy 3-인자 버전 — 26회차
+
+`groupingBy(분류기, Map공장, 다운스트림)` — 3가지를 한 번에 지정하는 형태.
+
+```java
+Collectors.groupingBy(
+    Note::getRating,                             // 1. 무엇으로 묶을지 (키)
+    () -> new TreeMap<>(Comparator.reverseOrder()), // 2. 어떤 Map을 쓸지 (정렬 포함)
+    Collectors.mapping(this::resolveAlcoholName, Collectors.toList()) // 3. 값을 어떻게 가공할지
+)
+```
+
+- 2번 인자에 `TreeMap(reverseOrder())`를 주면 키(별점)가 내림차순으로 자동 정렬됨.  
+- `Collectors.mapping`은 스트림의 각 요소를 변환한 뒤 수집하는 다운스트림 컬렉터.  
+- 2번 인자 없이 기본 `groupingBy`를 쓰면 `HashMap`이라 순서 보장 없음.
+
+---
+
+## null-safe 문자열 비교 — 26회차
+
+`"rating".equals(sort)` vs `sort.equals("rating")`
+
+- `sort`가 null이면 `sort.equals(...)` → NullPointerException 발생.
+- `"rating".equals(sort)` → null이면 그냥 false 반환, 안전함.
+- 상수(리터럴)를 앞에 두는 패턴을 **"Yoda condition"** 이라고도 부름.
+- String 비교 시 null이 올 수 있는 쪽은 항상 뒤에 두는 습관이 방어적 코딩의 기본.
+
+---
+
 ## OAuth2 클라이언트 사이드 플로우 — 21회차
 
 서버 사이드 리다이렉트(Spring Security OAuth2 내장)는 state 검증을 위해 세션이 필요하다.  
