@@ -71,6 +71,6 @@ public interface NoteRepository extends JpaRepository<Note, Long> {
 
     // ── 취향 카드 (PUBLISHED 노트, alcohol만 fetch) ───────────────────────
     @Query("SELECT n FROM Note n LEFT JOIN FETCH n.alcohol " +
-           "WHERE n.user.id = :userId AND n.status = 'PUBLISHED'")
-    List<Note> findPublishedNotesForTasteCard(@Param("userId") Long userId);
+           "WHERE n.user.id = :userId AND n.status = 'PUBLISHED' ORDER BY n.rating DESC")
+    List<Note> findPublishedNotesByUserId(@Param("userId") Long userId);
 }

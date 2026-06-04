@@ -24,6 +24,6 @@ public class TasteCardController {
     @SecurityRequirement(name = "bearerAuth")
     @GetMapping("/me/taste-card")
     public ResponseEntity<TasteCardResponse> getTasteCard(@CurrentUserId Long userId) {
-        return ResponseEntity.ok(tasteCardService.getTasteCard(userId));
+        return ResponseEntity.ok(tasteCardService.getTasteCardGroupedByRating(userId));
     }
 }

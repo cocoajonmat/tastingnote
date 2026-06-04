@@ -9,10 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,15 +21,14 @@ public class TasteCardService {
 
     private final NoteRepository noteRepository;
 
-    public TasteCardResponse getTasteCard(Long userId) {
-        List<Note> notes = noteRepository.findPublishedNotesForTasteCard(userId);
+    public TasteCardResponse getTasteCardGroupedByRating(Long userId) {
+        List<Note> notes = noteRepository.findPublishedNotesByUserId(userId);
 
-        // 별점 내림차순(역순 TreeMap)으로 그룹핑
         Map<BigDecimal, List<String>> grouped = notes.stream()
                 .collect(Collectors.groupingBy(
                         Note::getRating,
-                        () -> new TreeMap<>(Comparator.reverseOrder()),
-                        Collectors.mapping(this::resolveAlcoholName, Collectors.toList())
+                        LinkedHashMap::new,
+                        Collectors.mapping(Note::getAlcoholDisplayName, Collectors.toList())
                 ));
 
         List<RatingGroup> ratings = grouped.entrySet().stream()
@@ -38,15 +36,5 @@ public class TasteCardService {
                 .toList();
 
         return new TasteCardResponse(ratings);
-    }
-
-    // alcohol.nameKo → alcohol.name → customAlcoholName 우선순위
-    private String resolveAlcoholName(Note note) {
-        if (note.getAlcohol() != null) {
-            String nameKo = note.getAlcohol().getNameKo();
-            if (nameKo != null && !nameKo.isBlank()) return nameKo;
-            return note.getAlcohol().getName();
-        }
-        return note.getCustomAlcoholName();
     }
 }
