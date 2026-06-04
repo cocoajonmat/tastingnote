@@ -58,6 +58,11 @@ com.dongjin.tastingnote
 ### 행동 데이터 수집
 - `UserEventAspect` (AOP)가 주요 서비스 메서드 호출 시 `UserEvent`를 자동 저장. 서비스 코드에 수집 로직 없음.
 
+## PR 작성 규칙
+
+- PR description의 Changes 항목은 실제 메서드/클래스 이름을 정확히 기재.
+- 설계 결정 사항(왜 이렇게 구현했는지)은 반드시 PR description에 포함. 리뷰어가 코드를 보기 전에 의도를 파악할 수 있어야 함.
+
 ## Coding Conventions
 
 - **DTO는 `record`로 작성.** `@Getter` + `@AllArgsConstructor` 조합 금지.
