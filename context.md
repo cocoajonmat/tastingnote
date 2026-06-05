@@ -147,10 +147,13 @@ com.dongjin.tastingnote
 ├── user/entity/UserRole.java                    ← 13회차 신설
 ├── user/repository/UserRepository.java
 ├── user/service/UserService.java
+├── user/service/TasteCardService.java           ← 26회차 신설
 ├── user/controller/UserController.java
+├── user/controller/TasteCardController.java     ← 26회차 신설
 ├── user/dto/SignUpRequest.java
 ├── user/dto/LoginRequest.java
 ├── user/dto/TokenResponse.java
+├── user/dto/TasteCardResponse.java              ← 26회차 신설
 ├── alcohol/entity/Alcohol.java
 ├── alcohol/entity/AlcoholAlias.java
 ├── alcohol/entity/AlcoholCategory.java
@@ -489,7 +492,7 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 
 ### 미완성 (다음 순서)
 > 작업 시작 전 반드시 새 브랜치 먼저 만들기: `git checkout -b feature/브랜치명`
-> **현재 브랜치: `feature/user-event`** — Phase 1 구현 완료, PR 대기 중
+> **현재 브랜치: `feature/taste-page`** — 바텐더 취향 카드 구현 완료, PR 대기 중
 
 1. ~~FlavorSuggestion 엔티티 생성~~ ✅ 완료
 2. ~~AlcoholService / AlcoholController~~ ✅ 완료 (feature/alcohol-api, 2026-04-03)
@@ -607,29 +610,28 @@ Report → NoteImage → NoteFlavor → NoteTag → Note
 11. ~~RefreshToken 정리 스케줄러~~ — 12회차에서 RT Stateless 전환으로 불필요해짐
 
 ---
-> **출시 후 로드맵 (23회차 기획, 2026-05-16)**
+> **출시 후 로드맵 (23회차 기획, 2026-05-16) → 26회차부터 지금 바로 진행으로 변경**
 
 11-1. ~~**LLM 추천 Phase 1: 행동 데이터 수집**~~ ✅ 완료 (25회차, 2026-05-26, feature/user-event)
+
+12-1. ~~**바텐더 취향 카드**~~ ✅ 완료 (26회차, 2026-06-02, feature/taste-page)
+    - `GET /api/users/me/taste-card` — PUBLISHED 노트를 별점별로 그룹핑, 별점 내림차순
+    - TasteCardController / TasteCardService / TasteCardResponse 신규
+    - NoteRepository.findPublishedNotesForTasteCard() 추가
     - UserEvent 엔티티 (userId, eventType, metadata JSON, createdAt)
     - UserEventType: NOTE_CREATED / NOTE_RATED / SEARCH / VIEW_ALCOHOL / VIEW_NOTE
     - AOP(UserEventAspect)로 기존 API 코드 수정 없이 자동 기록
     - 비로그인 유저 제외, 이벤트 저장 실패 시 API 영향 없음
     - Like 이벤트(LIKE_NOTE)는 Like 기능 구현 후 추가 예정
 
-12. [1단계] 내 취향 페이지 — 약 1.5일
-    - 바텐더 취향 카드 — 반나절
-      - 별점 구간별 카테고리 (5점대: 최애 / 4점대: 좋음 / 3점대: 무난 / 이하: 별로)
-      - QR/링크 없이 폰 화면 직접 보여주는 방식
-      - API: GET /api/users/me/taste-card
-    - 개인 술 순위 — 반나절~1일
-      - 별점 기반 자동 정렬 (수동 드래그 없음, 기존 정렬 파라미터 추가)
-    - 내 취향 페이지는 별도 네비게이션 메뉴로 분리
+12. [1단계] 내 취향 페이지
+    - ~~바텐더 취향 카드~~ ✅ 완료 (26회차)
+    - 개인 술 순위 — 유저가 직접 드래그해서 순서를 정하는 방식 (UserAlcoholRank 테이블 필요, 미구현)
 
-13. [2단계] LLM 추천 시스템 — 약 7~8일 (출시 후 1~2달 뒤, 데이터 쌓인 후 시작)
+13. **[2단계] LLM 추천 시스템 — 약 7~8일 (출시 전 지금 바로 진행, 26회차~)**
     - LLM: Gemini 2.0 Flash (무료 티어 1M 토큰/일, Google 공식 Java SDK)
-    - Phase 1. 행동 데이터 수집 (UserEvent 엔티티, AOP 자동 기록) — 1.5일
-      - 수집: 별점/노트/좋아요 + 술 상세 클릭 + 검색어 + 맛/향 태그 (체류시간 제외)
-    - Phase 2. 사용자 프로파일 빌더 (이벤트 집계 → 취향 점수화, 스케줄러) — 1일
+    - ~~Phase 1. 행동 데이터 수집 (UserEvent 엔티티, AOP 자동 기록)~~ ✅ 완료 (25회차)
+    - **Phase 2. 사용자 프로파일 빌더 (이벤트 집계 → 취향 점수화, 스케줄러) — 1일 ← 다음 작업**
     - Phase 3. 온보딩 취향 선택 (POST /api/users/me/onboarding) — 0.5일
       - Cold Start 해결: 술 종류 + 선호 맛 4~6개 선택
     - Phase 4. Gemini API 연동 (프롬프트 설계/튜닝, 24h 캐시) — 1.5일

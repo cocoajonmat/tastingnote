@@ -67,6 +67,15 @@ public class Note extends BaseEntity {
     @Builder.Default
     private int likeCount = 0;
 
+    public String getAlcoholDisplayName() {
+        if (alcohol != null) {
+            String nameKo = alcohol.getNameKo();
+            if (nameKo != null && !nameKo.isBlank()) return nameKo;
+            return alcohol.getName();
+        }
+        return customAlcoholName;
+    }
+
     // 노트 내용 수정
     public void update(Alcohol alcohol, String customAlcoholName, String title, String taste, String aroma, String pairing,
                        BigDecimal rating, String description, Boolean isPublic, LocalDate drankAt, String location) {

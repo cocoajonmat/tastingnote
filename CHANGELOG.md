@@ -6,6 +6,21 @@ context.md 완료 섹션은 "무엇을 했는지"만 기록하고,
 
 ---
 
+## 2026-06-02 — 내 취향 페이지 1단계: 바텐더 취향 카드 (26회차)
+
+### Added
+- `TasteCardResponse` DTO — `List<RatingGroup>` (rating + alcoholNames) 응답 구조
+- `TasteCardService` — PUBLISHED 노트를 별점별로 그룹핑, `resolveAlcoholName()` 우선순위 로직 (nameKo → name → customAlcoholName)
+- `TasteCardController` — `GET /api/users/me/taste-card` 신규 엔드포인트
+- `NoteRepository.findPublishedNotesForTasteCard()` — 취향 카드 전용 쿼리 (user JOIN 제거, alcohol만 fetch)
+
+### 설계 결정
+- **Java에서 그룹핑** — SQL GROUP BY 대신 `Collectors.groupingBy` + `TreeMap(Comparator.reverseOrder())` 사용. 술 이름 우선순위 로직(nameKo → name → customAlcoholName)을 SQL CASE WHEN으로 넣으면 쿼리가 복잡해지고, 내 노트 전체가 대상이라 데이터 양이 적어 Java 처리가 더 적합.
+- **sort=rating 기각** — 개인 술 순위 기능을 "별점순 정렬"로 구현했다가 제거. 친구 피드백 기반으로 개인 술 순위는 "유저가 직접 드래그해서 순서를 정하는 방식"이라는 걸 확인 → 별도 UserAlcoholRank 테이블이 필요한 다른 기능. 별점순 정렬은 내 취향 탭에서 쓸 화면이 없어 불필요한 코드로 판단, NoteRepository/Service/Controller에서 전부 제거.
+- **PUBLISHED 노트 전체 조회** — 취향 카드는 페이지네이션 없이 내 PUBLISHED 노트 전체를 한 번에 조회. 기존 `findMyNotesPaged`(Page 반환)와 다른 List 반환 쿼리를 별도로 추가한 이유.
+
+---
+
 ## 2026-05-26 — LLM 추천 시스템 Phase 1: 행동 데이터 수집 (25회차)
 
 ### Added
