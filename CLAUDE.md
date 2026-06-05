@@ -58,6 +58,15 @@ com.dongjin.tastingnote
 ### 행동 데이터 수집
 - `UserEventAspect` (AOP)가 주요 서비스 메서드 호출 시 `UserEvent`를 자동 저장. 서비스 코드에 수집 로직 없음.
 
+## 현재 진행 상황
+
+### 완료
+- 바텐더 취향 카드 API (`GET /api/users/me/taste-card`) — main 머지 완료
+
+### 다음 작업
+- 개인 술 순위 API — 별점 기반 자동 정렬 방식, 설계부터 시작
+- LLM 추천 Phase 2 — 사용자 프로파일 빌더 (이벤트 집계 → 취향 점수화)
+
 ## PR 작성 규칙
 
 - PR description의 Changes 항목은 실제 메서드/클래스 이름을 정확히 기재.
