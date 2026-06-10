@@ -7,6 +7,8 @@ import com.dongjin.tastingnote.event.entity.UserEventType;
 import com.dongjin.tastingnote.event.repository.UserEventRepository;
 import com.dongjin.tastingnote.note.entity.Note;
 import com.dongjin.tastingnote.note.repository.NoteRepository;
+import com.dongjin.tastingnote.user.dto.UserProfileData;
+import com.dongjin.tastingnote.user.dto.UserProfileData.TopAlcohol;
 import com.dongjin.tastingnote.user.entity.UserProfile;
 import com.dongjin.tastingnote.user.repository.UserProfileRepository;
 import com.dongjin.tastingnote.user.repository.UserRepository;
@@ -171,19 +173,4 @@ public class UserProfileService {
         }
     }
 
-    record UserProfileData(
-            int totalNotes,
-            BigDecimal avgRating,
-            Map<String, Double> categoryScores,
-            List<TopAlcohol> topRatedAlcohols,
-            List<String> recentSearchKeywords,
-            LocalDateTime updatedAt
-    ) {}
-
-    record TopAlcohol(
-            Long alcoholId,
-            String name,
-            String nameKo,
-            BigDecimal rating
-    ) {}
 }
