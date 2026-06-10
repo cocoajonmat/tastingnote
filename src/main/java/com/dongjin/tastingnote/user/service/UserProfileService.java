@@ -113,7 +113,6 @@ public class UserProfileService {
     private List<TopAlcohol> computeTopRatedAlcohols(List<Note> notes) {
         return notes.stream()
                 .filter(n -> n.getAlcohol() != null)
-                .sorted(Comparator.comparing(Note::getRating).reversed())
                 .limit(MAX_TOP_ALCOHOLS)
                 .map(n -> new TopAlcohol(
                         n.getAlcohol().getId(),
