@@ -19,10 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -58,18 +55,12 @@ public class UserProfileService {
         List<UserEvent> events = userEventRepository.findAllByUserId(userId);
         List<Note> publishedNotes = noteRepository.findPublishedNotesByUserId(userId);
 
-        Map<String, Double> categoryScores = computeCategoryScores(events);
-        List<TopAlcohol> topRatedAlcohols = computeTopRatedAlcohols(publishedNotes);
-        List<String> recentSearchKeywords = extractRecentSearchKeywords(events);
-        int totalNotes = publishedNotes.size();
-        BigDecimal avgRating = computeAvgRating(publishedNotes);
-
         UserProfileData data = new UserProfileData(
-                totalNotes,
-                avgRating,
-                categoryScores,
-                topRatedAlcohols,
-                recentSearchKeywords,
+                publishedNotes.size(),
+                computeAvgRating(publishedNotes),
+                computeCategoryScores(events),
+                computeTopRatedAlcohols(publishedNotes),
+                extractRecentSearchKeywords(events),
                 LocalDateTime.now()
         );
 
@@ -85,40 +76,35 @@ public class UserProfileService {
     }
 
     private Map<String, Double> computeCategoryScores(List<UserEvent> events) {
-        List<Long> alcoholIds = events.stream()
+        List<UserEvent> alcoholEvents = events.stream()
                 .filter(e -> e.getEventType() == UserEventType.VIEW_ALCOHOL
                         || e.getEventType() == UserEventType.NOTE_CREATED
                         || e.getEventType() == UserEventType.NOTE_RATED)
-                .map(e -> extractLong(e.getMetadata(), "alcoholId"))
-                .filter(id -> id != null)
-                .distinct()
                 .toList();
 
-        Map<Long, String> alcoholCategoryMap = alcoholRepository.findAllById(alcoholIds).stream()
+        Set<Long> alcoholIds = alcoholEvents.stream()
+                .map(e -> MetadataParser.parse(e.getMetadata(), objectMapper).getLong("alcoholId"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> categoryMap = alcoholRepository.findAllById(alcoholIds).stream()
                 .collect(Collectors.toMap(Alcohol::getId, a -> a.getCategory().name()));
 
         Map<String, Double> scores = new HashMap<>();
-
-        for (UserEvent event : events) {
-            Long alcoholId = extractLong(event.getMetadata(), "alcoholId");
-            if (alcoholId == null) continue;
-
-            String category = alcoholCategoryMap.get(alcoholId);
+        for (UserEvent event : alcoholEvents) {
+            MetadataParser meta = MetadataParser.parse(event.getMetadata(), objectMapper);
+            Long alcoholId = meta.getLong("alcoholId");
+            String category = alcoholId != null ? categoryMap.get(alcoholId) : null;
             if (category == null) continue;
 
             double score = switch (event.getEventType()) {
                 case VIEW_ALCOHOL -> VIEW_SCORE;
                 case NOTE_CREATED -> NOTE_CREATED_SCORE;
-                case NOTE_RATED -> {
-                    Double rating = extractDouble(event.getMetadata(), "rating");
-                    yield rating != null ? rating : 0.0;
-                }
+                case NOTE_RATED -> Objects.requireNonNullElse(meta.getDouble("rating"), 0.0);
                 default -> 0.0;
             };
-
             scores.merge(category, score, Double::sum);
         }
-
         return scores;
     }
 
@@ -140,7 +126,7 @@ public class UserProfileService {
         return events.stream()
                 .filter(e -> e.getEventType() == UserEventType.SEARCH)
                 .sorted(Comparator.comparing(UserEvent::getCreatedAt).reversed())
-                .map(e -> extractString(e.getMetadata(), "keyword"))
+                .map(e -> MetadataParser.parse(e.getMetadata(), objectMapper).getString("keyword"))
                 .filter(k -> k != null && !k.isBlank())
                 .distinct()
                 .limit(MAX_SEARCH_KEYWORDS)
@@ -155,34 +141,34 @@ public class UserProfileService {
         return sum.divide(BigDecimal.valueOf(notes.size()), 1, RoundingMode.HALF_UP);
     }
 
-    private Long extractLong(String metadata, String key) {
-        if (metadata == null) return null;
-        try {
-            Map<?, ?> map = objectMapper.readValue(metadata, Map.class);
-            Object val = map.get(key);
-            if (val instanceof Number) return ((Number) val).longValue();
-        } catch (Exception ignored) {}
-        return null;
-    }
+    private static class MetadataParser {
+        private final Map<?, ?> map;
 
-    private Double extractDouble(String metadata, String key) {
-        if (metadata == null) return null;
-        try {
-            Map<?, ?> map = objectMapper.readValue(metadata, Map.class);
-            Object val = map.get(key);
-            if (val instanceof Number) return ((Number) val).doubleValue();
-        } catch (Exception ignored) {}
-        return null;
-    }
+        private MetadataParser(Map<?, ?> map) { this.map = map; }
 
-    private String extractString(String metadata, String key) {
-        if (metadata == null) return null;
-        try {
-            Map<?, ?> map = objectMapper.readValue(metadata, Map.class);
+        static MetadataParser parse(String metadata, ObjectMapper mapper) {
+            if (metadata == null) return new MetadataParser(Map.of());
+            try {
+                return new MetadataParser(mapper.readValue(metadata, Map.class));
+            } catch (Exception e) {
+                return new MetadataParser(Map.of());
+            }
+        }
+
+        Long getLong(String key) {
+            Object val = map.get(key);
+            return val instanceof Number n ? n.longValue() : null;
+        }
+
+        Double getDouble(String key) {
+            Object val = map.get(key);
+            return val instanceof Number n ? n.doubleValue() : null;
+        }
+
+        String getString(String key) {
             Object val = map.get(key);
             return val != null ? val.toString() : null;
-        } catch (Exception ignored) {}
-        return null;
+        }
     }
 
     record UserProfileData(
