@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -59,7 +58,6 @@ public class UserProfileService {
 
         UserProfileData data = new UserProfileData(
                 publishedNotes.size(),
-                computeAvgRating(publishedNotes),
                 computeCategoryScores(events),
                 computeTopRatedAlcohols(publishedNotes),
                 extractRecentSearchKeywords(events),
@@ -132,14 +130,6 @@ public class UserProfileService {
                 .distinct()
                 .limit(MAX_SEARCH_KEYWORDS)
                 .toList();
-    }
-
-    private BigDecimal computeAvgRating(List<Note> notes) {
-        if (notes.isEmpty()) return BigDecimal.ZERO;
-        BigDecimal sum = notes.stream()
-                .map(Note::getRating)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return sum.divide(BigDecimal.valueOf(notes.size()), 1, RoundingMode.HALF_UP);
     }
 
     private static class MetadataParser {

@@ -7,7 +7,6 @@ import java.util.Map;
 
 public record UserProfileData(
         int totalNotes,
-        BigDecimal avgRating,
         Map<String, Double> categoryScores,
         List<TopAlcohol> topRatedAlcohols,
         List<String> recentSearchKeywords,
