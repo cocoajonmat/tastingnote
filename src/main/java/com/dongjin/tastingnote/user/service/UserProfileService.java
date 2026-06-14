@@ -113,7 +113,6 @@ public class UserProfileService {
                 .filter(n -> n.getAlcohol() != null)
                 .limit(MAX_TOP_ALCOHOLS)
                 .map(n -> new TopAlcohol(
-                        n.getAlcohol().getId(),
                         n.getAlcohol().getName(),
                         n.getAlcohol().getNameKo(),
                         n.getRating()

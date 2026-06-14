@@ -13,7 +13,6 @@ public record UserProfileData(
         LocalDateTime updatedAt
 ) {
     public record TopAlcohol(
-            Long alcoholId,
             String name,
             String nameKo,
             BigDecimal rating
